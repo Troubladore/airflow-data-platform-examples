@@ -25,14 +25,14 @@ This gives you a **complete working example** that demonstrates the platform pat
 ## 📚 Learning Path
 
 ### 👋 **New to the Platform?**
-1. **[Getting Started Guide](./docs/GETTING-STARTED.md)** - Your first 15 minutes
+1. **[Getting Started Guide](./docs/getting-started.md)** - Your first 15 minutes
 2. **[Basic Example](./pagila-implementations/pagila-sqlmodel-basic/)** - Working SQLModel patterns
-3. **[Implementation Guide](./docs/IMPLEMENTATION-GUIDE.md)** - Build your business version
+3. **[Implementation Guide](./docs/implementation-guide.md)** - Build your business version
 
 ### 🏗️ **Ready to Build?**
-1. **[Business Setup Patterns](./docs/BUSINESS-SETUP-PATTERNS.md)** - Repository structure
-2. **[Schema Design Patterns](./docs/PATTERNS.md)** - Common data modeling approaches
-3. **[Deployment Guide](./docs/DEPLOYMENT-GUIDE.md)** - Production deployment
+1. **[Business Setup Patterns](./docs/business-setup-patterns.md)** - Repository structure
+2. **[Schema Design Patterns](./docs/patterns.md)** - Common data modeling approaches (planned)
+3. **[Deployment Guide](./docs/deployment-guide.md)** - Production deployment (planned)
 
 ### 🎯 **Advanced Patterns?**
 - Multiple implementation examples (coming soon!)
@@ -123,4 +123,4 @@ Found a useful pattern? Share it!
 
 ---
 
-**Ready to build your data platform?** Start with the [Getting Started Guide](./docs/GETTING-STARTED.md)! 🚀
+**Ready to build your data platform?** Start with the [Getting Started Guide](./docs/getting-started.md)! 🚀
