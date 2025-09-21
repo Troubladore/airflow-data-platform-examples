@@ -4,21 +4,6 @@ Working examples and implementation guides for the Airflow Data Platform. Contai
 
 This repository contains **examples and business implementations**. For the platform framework, see [airflow-data-platform](https://github.com/Troubladore/airflow-data-platform).
 
-## 🚀 Quick Start
-
-**New to the platform?** → **[Getting Started Guide](docs/getting-started.md)**
-
-**Ready to explore?** → **[Running the Examples](docs/running-examples.md)**
-
-**Ready to build?** → **[Business Implementation Guide](docs/implementation-guide.md)**
-
-## 📖 Documentation
-
-- **[docs/](docs/)** - Complete examples documentation and guides
-- **[Getting Started](docs/getting-started.md)** - Platform concepts and first steps
-- **[Running the Examples](docs/running-examples.md)** - Install, test, and explore Pagila examples
-- **[Business Implementation](docs/implementation-guide.md)** - Build your own data platform
-
 ## 🏗️ Learning Journeys
 
 ### **How to Use the Platform**
@@ -35,6 +20,14 @@ This repository contains **examples and business implementations**. For the plat
 1. **[Fork & Customize](docs/implementation-guide.md)** - Start with examples, adapt for your business
 2. **[Green Field Setup](docs/business-setup-patterns.md)** - Build from scratch using platform patterns
 3. **[Migration Guide](docs/migration-guide.md)** - Move existing data workflows to platform
+
+## 📖 Documentation
+
+- **[docs/](docs/)** - Complete examples documentation and guides
+- **[Getting Started](docs/getting-started.md)** - Platform concepts and first steps
+- **[Running the Examples](docs/running-examples.md)** - Install, test, and explore Pagila examples
+- **[Learning Path](docs/learning-path.md)** - Detailed study progression
+- **[Business Implementation](docs/implementation-guide.md)** - Build your own data platform
 
 ## 🏛️ Example Implementations
 
