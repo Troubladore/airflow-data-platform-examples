@@ -20,12 +20,14 @@ class Customer(SQLModel, table=True):
     address_id: int = Field(
         sa_column=Column(ForeignKey("public.address.address_id"), nullable=False)
     )
-    activebool: bool = Field(nullable=False, default=True, server_default=text("true"))
+    activebool: bool = Field(
+        sa_column=Column(nullable=False, server_default=text("true")),
+        default=True
+    )
     create_date: date = Field(
         sa_column=Column(
             DATE,
             nullable=False,
-            default=text("('now'::text)::date"),
             server_default=text("('now'::text)::date"),
         )
     )
@@ -33,7 +35,6 @@ class Customer(SQLModel, table=True):
         sa_column=Column(
             TIMESTAMP(timezone=True),
             nullable=True,
-            default=text("now()"),
             server_default=text("now()"),
         )
     )

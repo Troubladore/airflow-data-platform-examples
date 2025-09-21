@@ -41,24 +41,23 @@ class Film(SQLModel, table=True):
         default=None,
     )
     rental_duration: int = Field(
-        sa_column=Column(SMALLINT, nullable=False, default=3, server_default=text("3"))
+        sa_column=Column(SMALLINT, nullable=False, server_default=text("3"))
     )
     rental_rate: float = Field(
         sa_column=Column(
-            Numeric(4, 2), nullable=False, default=4.99, server_default=text("4.99")
+            Numeric(4, 2), nullable=False, server_default=text("4.99")
         )
     )
     length: int | None = Field(sa_column=Column(SMALLINT, nullable=True), default=None)
     replacement_cost: float = Field(
         sa_column=Column(
-            Numeric(5, 2), nullable=False, default=19.99, server_default=text("19.99")
+            Numeric(5, 2), nullable=False, server_default=text("19.99")
         )
     )
     rating: MPAARating | None = Field(
         sa_column=Column(
             SQLEnum(MPAARating, name="mpaa_rating"),
             nullable=True,
-            default=MPAARating.G,
             server_default=text("'G'::mpaa_rating"),
         )
     )
@@ -66,7 +65,6 @@ class Film(SQLModel, table=True):
         sa_column=Column(
             TIMESTAMP(timezone=True),
             nullable=False,
-            default=text("now()"),
             server_default=text("now()"),
         )
     )

@@ -21,7 +21,6 @@ class Inventory(SQLModel, table=True):
         sa_column=Column(
             TIMESTAMP(timezone=True),
             nullable=False,
-            default=text("now()"),
             server_default=text("now()"),
         )
     )
