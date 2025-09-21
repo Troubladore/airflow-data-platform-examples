@@ -4,6 +4,16 @@ Welcome to the **learning hub** for the Airflow Data Platform! This repository c
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+**Platform setup required first!** These examples need the platform environment to run:
+
+👉 **[Platform Setup Guide](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started.md)**
+
+This sets up Docker registry, HTTPS certificates, and local development services.
+
+### Run the Examples
+
 ```bash
 git clone https://github.com/Troubladore/airflow-data-platform-examples.git
 cd airflow-data-platform-examples/pagila-implementations/pagila-sqlmodel-basic

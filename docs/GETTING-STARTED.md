@@ -2,6 +2,14 @@
 
 Welcome! This guide will walk you through using the Airflow Data Platform to build your business data infrastructure.
 
+## Prerequisites
+
+**Complete platform setup first!** Examples require the platform environment:
+
+👉 **[Platform Setup Guide](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started.md)**
+
+This installs Docker registry, Traefik proxy, HTTPS certificates, and local development services.
+
 ## 🎯 Quick Start
 
 The fastest way to understand the platform is to explore our working examples and then build your own implementation.
