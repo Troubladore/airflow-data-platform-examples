@@ -1,0 +1,28 @@
+[project]
+name = "datakit-pagila-source"
+version = "0.1.0"
+description = "Pagila source database reference schema and local test setup"
+requires-python = "==3.12.11"
+dependencies = [
+    "data-platform-framework",
+    "psycopg[binary]==3.2.4",
+    "docker==7.1.0"
+]
+
+[project.scripts]
+pagila-source = "datakit_pagila_source.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+data-platform-framework = { path = "../../data-workspace/data-platform-framework", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["datakit_pagila_source"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend = "../../data-workspace/pyproject.toml"
