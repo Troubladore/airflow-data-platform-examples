@@ -28,7 +28,22 @@ This example shows:
 - **Platform dependency** - How to import framework utilities
 - **Business customization** - How to extend for your domain
 
-### Step 2: Understand the Pattern
+### Step 2: Validate the Integration
+
+Test that the platform + examples work together:
+
+```bash
+# Run integration tests to verify everything works
+./scripts/test-examples-integration.sh
+```
+
+This validates:
+- **Platform framework** can deploy business schemas
+- **PostgreSQL compatibility** with all table types
+- **Complete schema creation** including foreign keys
+- **End-to-end workflow** from source models to warehouse
+
+### Step 3: Understand the Pattern
 
 The platform follows a **dependency pattern**:
 - **Your business repo** imports the platform as a UV dependency
@@ -41,7 +56,7 @@ The platform follows a **dependency pattern**:
 sqlmodel-framework = {git = "https://github.com/Troubladore/airflow-data-platform.git", branch = "main", subdirectory = "data-platform/sqlmodel-workspace/sqlmodel-framework"}
 ```
 
-### Step 3: Build Your Implementation
+### Step 4: Build Your Implementation
 
 1. **Copy example structure** as your starting point
 2. **Replace Pagila schemas** with your business schemas
