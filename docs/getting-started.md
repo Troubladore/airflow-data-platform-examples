@@ -128,8 +128,8 @@ your-company-data-platform/
 ## 📖 Additional Resources
 
 - **[Platform Repository](https://github.com/Troubladore/airflow-data-platform)** - Technical documentation
-- **[Implementation Guide](./IMPLEMENTATION-GUIDE.md)** - Step-by-step business setup
-- **[Pattern Library](./PATTERNS.md)** - Common data platform patterns
-- **[Troubleshooting](./TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Implementation Guide](./implementation-guide.md)** - Step-by-step business setup
+- **[Pattern Library](./business-setup-patterns.md)** - Common data platform patterns
+- **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
 
 Remember: The platform provides the foundation, you provide the business value! 🎯
