@@ -43,9 +43,9 @@ def extract_pagila_to_bronze(**context):
 
     # This would use the platform framework to:
     # 1. Connect to source Pagila database
-    # 2. Extract customer, film, rental, etc. tables
+    # 2. Extract customer, film, rental, etc. tables with STRICT TYPE VALIDATION
     # 3. Add bronze audit fields (br_load_time, br_batch_id, br_record_hash)
-    # 4. Load to staging_pagila.br_* tables with lenient typing
+    # 4. Load to staging_pagila.br_* tables - FAILS FAST on contract violations
 
     batch_id = context['ds'] + '_' + context['ts']
     tables_processed = ['customer', 'film', 'rental', 'inventory', 'actor']
@@ -149,10 +149,10 @@ with DAG(
             python_callable=extract_pagila_to_bronze,
             doc_md="""
             ### 🥉 Bronze Layer Extraction
-            - Extracts all Pagila source tables
+            - Extracts all Pagila source tables with STRICT TYPE CONTRACTS
             - Adds bronze audit fields (load_time, batch_id, record_hash)
-            - Uses lenient typing to handle data quality issues
-            - Loads to staging_pagila schema
+            - FAILS FAST on type mismatches to detect source changes
+            - Loads to staging_pagila schema with contract enforcement
             """
         )
 

@@ -193,13 +193,13 @@ deploy_data_objects(table_classes, target_config)
 **Current Status**: The examples now demonstrate **complete Bronze→Silver→Gold pipeline** including:
 
 - ✅ **Airflow DAG** - Complete pipeline orchestration (`pagila_bronze_silver_gold_pipeline`)
-- ✅ **Bronze layer models** - Warehouse ingestion with audit fields (`BrCustomer`, `BrFilm`)
+- ✅ **Bronze layer models** - Strict data contracts with fail-fast validation (`BrCustomer`, `BrFilm`)
 - ✅ **Silver layer transformations** - Business rules and data quality validation
 - ✅ **Gold layer analytics** - Dimensional models and KPIs
 - ✅ **Data pipeline** - Full medallion architecture implementation
 
 **Pipeline Components**:
-- **Bronze Layer**: `datakit_pagila_bronze/` with audit fields and lenient typing
+- **Bronze Layer**: `datakit_pagila_bronze/` with audit fields and strict contract enforcement
 - **Orchestration**: `orchestration/pagila_bronze_silver_gold_dag.py` - Complete Airflow DAG
 - **Task Groups**: Bronze extraction → Silver transformation → Gold aggregation → Validation
 - **Schedule**: Daily at 6:00 AM UTC with proper task dependencies

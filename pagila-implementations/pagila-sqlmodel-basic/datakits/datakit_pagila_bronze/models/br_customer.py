@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -9,8 +9,8 @@ from sqlmodel import Field, SQLModel
 class BrCustomer(SQLModel, table=True):
     """Bronze layer customer table (staging_pagila.br_customer).
 
-    Ingests data from source pagila.customer with audit fields and lenient typing
-    to handle data quality issues during initial ingestion.
+    Enforces strict data contracts from source pagila.customer with audit fields.
+    FAILS FAST on type mismatches to detect source system changes immediately.
     """
 
     __tablename__ = "br_customer"
@@ -19,17 +19,17 @@ class BrCustomer(SQLModel, table=True):
     # Bronze surrogate key
     br_customer_key: UUID = Field(default_factory=uuid4, primary_key=True)
 
-    # Source data fields (lenient types for data quality handling)
-    customer_id: Optional[str] = Field(default=None, nullable=True)
-    store_id: Optional[str] = Field(default=None, nullable=True)
-    first_name: Optional[str] = Field(default=None, nullable=True)
-    last_name: Optional[str] = Field(default=None, nullable=True)
-    email: Optional[str] = Field(default=None, nullable=True)
-    address_id: Optional[str] = Field(default=None, nullable=True)
-    activebool: Optional[str] = Field(default=None, nullable=True)  # TEXT to handle bad booleans
-    create_date: Optional[str] = Field(default=None, nullable=True)  # TEXT to handle bad dates
-    last_update: Optional[str] = Field(default=None, nullable=True)
-    active: Optional[str] = Field(default=None, nullable=True)
+    # Source data fields (STRICT CONTRACT ENFORCEMENT - fail fast on schema changes)
+    customer_id: int = Field(nullable=False)  # Contract: must be integer, required
+    store_id: int = Field(nullable=False)  # Contract: must be integer, required
+    first_name: str = Field(nullable=False)  # Contract: must be string, required
+    last_name: str = Field(nullable=False)  # Contract: must be string, required
+    email: str | None = Field(default=None, nullable=True)  # Contract: string or null (optional)
+    address_id: int = Field(nullable=False)  # Contract: must be integer, required
+    activebool: bool = Field(nullable=False, default=True)  # Contract: must be boolean, required
+    create_date: date = Field(nullable=False)  # Contract: must be date, required
+    last_update: datetime | None = Field(default=None, nullable=True)  # Contract: datetime or null
+    active: int | None = Field(default=None, nullable=True)  # Contract: integer or null
 
     # Bronze audit fields
     br_load_time: datetime = Field(
