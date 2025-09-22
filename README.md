@@ -23,11 +23,7 @@ This repository contains **examples and business implementations**. For the plat
 
 ## 📖 Documentation
 
-- **[docs/](docs/)** - Complete examples documentation and guides
-- **[Getting Started](docs/getting-started.md)** - Platform concepts and first steps
-- **[Running the Examples](docs/running-examples.md)** - Install, test, and explore Pagila examples
-- **[Learning Path](docs/learning-path.md)** - Detailed study progression
-- **[Business Implementation](docs/implementation-guide.md)** - Build your own data platform
+- **[Complete Documentation Index](docs/index.md)** - All guides and references
 
 ## 🏛️ Example Implementations
 
