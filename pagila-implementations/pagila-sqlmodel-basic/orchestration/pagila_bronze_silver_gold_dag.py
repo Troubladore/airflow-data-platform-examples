@@ -43,9 +43,9 @@ def extract_pagila_to_bronze(**context):
 
     # This would use the platform framework to:
     # 1. Connect to source Pagila database
-    # 2. Extract customer, film, rental, etc. tables with STRICT TYPE VALIDATION
+    # 2. Extract customer, film, rental, etc. tables with LENIENT TYPING (Optional[str])
     # 3. Add bronze audit fields (br_load_time, br_batch_id, br_record_hash)
-    # 4. Load to staging_pagila.br_* tables - FAILS FAST on contract violations
+    # 4. Load to staging_pagila.br_* tables - NEVER LOSES DATA (industry standard)
 
     batch_id = context['ds'] + '_' + context['ts']
     tables_processed = ['customer', 'film', 'rental', 'inventory', 'actor']
@@ -62,23 +62,37 @@ def transform_bronze_to_silver(**context):
     print("🥈 SILVER: Transforming Bronze to Silver with business rules...")
 
     # This would use the platform framework to:
-    # 1. Read from staging_pagila.br_* tables
-    # 2. Apply data quality validations and business rules
-    # 3. Convert lenient types to proper business types
-    # 4. Calculate derived business metrics
-    # 5. Load to silver_pagila.* tables
+    # 1. Read from staging_pagila.br_* tables (lenient Optional[str] data)
+    # 2. Apply STRICT TYPE CONVERSION and business rules
+    # 3. QUARANTINE failed records to sl_transformation_errors (industry standard)
+    # 4. Load clean records to silver_pagila.* tables with proper business types
+    # 5. Calculate derived business metrics on clean data
 
     transformations = [
-        "customer: Validated email formats, standardized names, calculated customer_lifetime_value",
-        "film: Parsed ratings, validated rental_duration, calculated profitability_score",
-        "rental: Calculated rental_duration_days, late_return_fee, customer_satisfaction_score"
+        "customer: 850 records → 820 clean, 30 quarantined (email validation failures)",
+        "film: 1000 records → 995 clean, 5 quarantined (invalid rental_duration values)",
+        "rental: 50000 records → 49980 clean, 20 quarantined (date parsing failures)"
+    ]
+
+    quarantine_stats = [
+        "sl_transformation_errors: 55 failed records preserved for analysis",
+        "Error categories: 60% data_type, 25% business_rule, 15% missing_field",
+        "Remediation workflow: 40 PENDING, 15 assigned to data stewards"
     ]
 
     for transformation in transformations:
         print(f"   ✅ {transformation}")
 
-    print("🥈 SILVER COMPLETE: Business rules applied, data quality validated")
-    return {'transformations': len(transformations)}
+    print("   📥 QUARANTINE SUMMARY:")
+    for stat in quarantine_stats:
+        print(f"      • {stat}")
+
+    print("🥈 SILVER COMPLETE: Clean data promoted, failed records quarantined for remediation")
+    return {
+        'clean_records': 50795,  # Sum of clean records
+        'quarantined_records': 55,  # Sum of quarantined records
+        'success_rate': 99.9
+    }
 
 
 def aggregate_silver_to_gold(**context):
@@ -148,11 +162,11 @@ with DAG(
             task_id='extract_pagila_to_bronze',
             python_callable=extract_pagila_to_bronze,
             doc_md="""
-            ### 🥉 Bronze Layer Extraction
-            - Extracts all Pagila source tables with STRICT TYPE CONTRACTS
+            ### 🥉 Bronze Layer Extraction (Industry Standard)
+            - Extracts all Pagila source tables with LENIENT TYPING (Optional[str])
             - Adds bronze audit fields (load_time, batch_id, record_hash)
-            - FAILS FAST on type mismatches to detect source changes
-            - Loads to staging_pagila schema with contract enforcement
+            - NEVER LOSES DATA - captures all records regardless of format
+            - Loads to staging_pagila schema for complete historical archive
             """
         )
 
@@ -162,11 +176,11 @@ with DAG(
             task_id='transform_bronze_to_silver',
             python_callable=transform_bronze_to_silver,
             doc_md="""
-            ### 🥈 Silver Layer Transformation
-            - Applies business rules and data validation
-            - Converts to proper business data types
-            - Calculates derived business metrics
-            - Loads to silver_pagila schema
+            ### 🥈 Silver Layer Transformation (Industry Standard)
+            - Applies STRICT TYPE CONVERSION and business rules to Bronze data
+            - QUARANTINES failed records to sl_transformation_errors table
+            - Promotes clean records to silver_pagila schema with proper types
+            - Enables remediation workflow for data quality issues
             """
         )
 

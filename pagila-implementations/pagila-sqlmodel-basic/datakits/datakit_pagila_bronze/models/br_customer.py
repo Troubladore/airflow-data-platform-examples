@@ -9,8 +9,9 @@ from sqlmodel import Field, SQLModel
 class BrCustomer(SQLModel, table=True):
     """Bronze layer customer table (staging_pagila.br_customer).
 
-    Enforces strict data contracts from source pagila.customer with audit fields.
-    FAILS FAST on type mismatches to detect source system changes immediately.
+    Industry standard Bronze pattern: lenient typing to prevent data loss.
+    All source fields stored as Optional[str] to capture any data format.
+    Type validation and business rules applied in Bronze→Silver transformation.
     """
 
     __tablename__ = "br_customer"
@@ -19,17 +20,17 @@ class BrCustomer(SQLModel, table=True):
     # Bronze surrogate key
     br_customer_key: UUID = Field(default_factory=uuid4, primary_key=True)
 
-    # Source data fields (STRICT CONTRACT ENFORCEMENT - fail fast on schema changes)
-    customer_id: int = Field(nullable=False)  # Contract: must be integer, required
-    store_id: int = Field(nullable=False)  # Contract: must be integer, required
-    first_name: str = Field(nullable=False)  # Contract: must be string, required
-    last_name: str = Field(nullable=False)  # Contract: must be string, required
-    email: str | None = Field(default=None, nullable=True)  # Contract: string or null (optional)
-    address_id: int = Field(nullable=False)  # Contract: must be integer, required
-    activebool: bool = Field(nullable=False, default=True)  # Contract: must be boolean, required
-    create_date: date = Field(nullable=False)  # Contract: must be date, required
-    last_update: datetime | None = Field(default=None, nullable=True)  # Contract: datetime or null
-    active: int | None = Field(default=None, nullable=True)  # Contract: integer or null
+    # Source data fields (LENIENT TYPING - industry standard Bronze pattern)
+    customer_id: Optional[str] = Field(default=None, nullable=True)  # Store as text to prevent data loss
+    store_id: Optional[str] = Field(default=None, nullable=True)
+    first_name: Optional[str] = Field(default=None, nullable=True)
+    last_name: Optional[str] = Field(default=None, nullable=True)
+    email: Optional[str] = Field(default=None, nullable=True)
+    address_id: Optional[str] = Field(default=None, nullable=True)
+    activebool: Optional[str] = Field(default=None, nullable=True)  # TEXT to handle varied boolean representations
+    create_date: Optional[str] = Field(default=None, nullable=True)  # TEXT to handle varied date formats
+    last_update: Optional[str] = Field(default=None, nullable=True)
+    active: Optional[str] = Field(default=None, nullable=True)
 
     # Bronze audit fields
     br_load_time: datetime = Field(
