@@ -14,11 +14,14 @@ This installs Docker registry, Traefik proxy, HTTPS certificates, and local deve
 
 The fastest way to understand the platform is to explore our working examples and then build your own implementation.
 
-### Step 1: Explore the Basic Example
+### Step 1: Install the Basic Example
 
 ```bash
 git clone https://github.com/Troubladore/airflow-data-platform-examples.git
-cd airflow-data-platform-examples/pagila-implementations/pagila-sqlmodel-basic
+cd airflow-data-platform-examples
+
+# Install the basic example (downloads platform framework from GitHub)
+cd pagila-implementations/pagila-sqlmodel-basic
 uv sync  # Installs platform + dependencies automatically
 ```
 
@@ -34,6 +37,8 @@ Test that the platform + examples work together:
 
 ```bash
 # Run integration tests to verify everything works
+# (Return to repository root from the pagila-sqlmodel-basic directory)
+cd ../..
 ./scripts/test-examples-integration.sh
 ```
 
