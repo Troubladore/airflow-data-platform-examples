@@ -106,7 +106,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.6" },
     { name = "sqlmodel", specifier = ">=0.0.25" },
-    { name = "sqlmodel-framework", git = "https://github.com/Troubladore/airflow-data-platform.git?subdirectory=data-platform%2Fsqlmodel-workspace%2Fsqlmodel-framework&rev=feature%2Flayer2-data-processing-v2" },
+    { name = "sqlmodel-framework", git = "https://github.com/Troubladore/airflow-data-platform.git?subdirectory=data-platform%2Fsqlmodel-workspace%2Fsqlmodel-framework&rev=main" },
 ]
 provides-extras = ["dev"]
 
@@ -297,7 +297,7 @@ wheels = [
 [[package]]
 name = "sqlmodel-framework"
 version = "1.0.0"
-source = { git = "https://github.com/Troubladore/airflow-data-platform.git?subdirectory=data-platform%2Fsqlmodel-workspace%2Fsqlmodel-framework&rev=feature%2Flayer2-data-processing-v2#e18e89a75bd49c28309acf7fba9ba74c0b19fb9d" }
+source = { git = "https://github.com/Troubladore/airflow-data-platform.git?subdirectory=data-platform%2Fsqlmodel-workspace%2Fsqlmodel-framework&rev=main#001ccd7f824f31858c99dae24d1e49aa917ef7f6" }
 dependencies = [
     { name = "psycopg2-binary" },
     { name = "pydantic" },

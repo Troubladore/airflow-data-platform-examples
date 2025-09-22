@@ -178,7 +178,7 @@ class TransactionalTableMixin(SQLModel):
 ```toml
 # In pyproject.toml
 dependencies = [
-    "sqlmodel-framework @ git+https://github.com/Troubladore/airflow-data-platform.git@feature/layer2-data-processing-v2#subdirectory=data-platform/sqlmodel-workspace/sqlmodel-framework"
+    "sqlmodel-framework @ git+https://github.com/Troubladore/airflow-data-platform.git@main#subdirectory=data-platform/sqlmodel-workspace/sqlmodel-framework"
 ]
 ```
 
