@@ -14,7 +14,7 @@ This repository contains **examples and business implementations**. For the plat
 1. **[Running the Examples](docs/running-examples.md)** - Complete walkthrough of Pagila examples
    - Install and validate examples
    - Run unit/integration tests
-   - Navigate Airflow to see Bronze→Silver→Gold data flows
+   - Explore schema deployment patterns
 
 ### **Ready to Build** (3 approaches)
 1. **[Fork & Customize](docs/implementation-guide.md)** - Start with examples, adapt for your business

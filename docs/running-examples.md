@@ -1,6 +1,8 @@
 # Running the Examples - Complete Walkthrough
 
-This guide walks you through installing, testing, and exploring all the Pagila examples to understand how the platform works in practice. You'll run unit/integration tests and navigate the Airflow container to see Bronze→Silver→Gold data flows in action.
+This guide walks you through installing, testing, and exploring the Pagila schema deployment example to understand how the platform works in practice. You'll run unit/integration tests and explore schema deployment patterns.
+
+**Note**: Full Airflow orchestration with Bronze→Silver→Gold data flows is planned for future implementation.
 
 ## Prerequisites
 
@@ -188,27 +190,22 @@ dependencies = [
 deploy_data_objects(table_classes, target_config)
 ```
 
-## 🐳 Airflow Container Exploration (Future)
+## 🚧 What's Missing: Airflow Orchestration
 
-*Note: Full Airflow orchestration is planned for future implementation. Current examples focus on schema deployment and validation.*
+**Current Status**: The examples demonstrate **schema deployment and validation** but do not yet include:
 
-### When Available: Navigate Running Airflow
+- ❌ **Airflow DAGs** - Data pipeline orchestration
+- ❌ **Bronze layer implementation** - Warehouse ingestion from source
+- ❌ **Silver layer** - Business rules and data quality
+- ❌ **Gold layer** - Analytics and aggregations
+- ❌ **Data flows** - Actual data movement and transformation
 
-**1. Access Airflow Web UI:**
-```bash
-# Airflow will be available at:
-open https://airflow.local.troubladore.dev
-```
-
-**2. Explore Data Pipeline DAGs:**
-- `pagila_bronze_ingestion` - Source → Bronze warehouse
-- `pagila_silver_transformation` - Bronze → Silver (business rules)
-- `pagila_gold_aggregation` - Silver → Gold (analytics)
-
-**3. Monitor Data Flows:**
-- View task execution logs
-- Inspect data lineage graphs
-- Monitor pipeline success/failure rates
+**Planned Implementation**:
+- `pagila_bronze_ingestion` - Source → Bronze warehouse DAG
+- `pagila_silver_transformation` - Bronze → Silver business rules DAG
+- `pagila_gold_aggregation` - Silver → Gold analytics DAG
+- Airflow web UI at `https://airflow.local.troubladore.dev`
+- Complete data lineage and monitoring
 
 ## 🎯 What You've Accomplished
 
@@ -220,6 +217,7 @@ After completing this walkthrough, you've:
 ✅ **Run integration tests** validating platform + examples
 ✅ **Understood relationships** between 12 Pagila database tables
 ✅ **Seen deployment utilities** in action with real schemas
+📋 **Identified next steps** for implementing full data orchestration
 
 ## 🚀 Next Steps
 

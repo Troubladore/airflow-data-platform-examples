@@ -33,7 +33,7 @@ Detailed study progression for mastering the Airflow Data Platform, from basic c
 ### **Beginner (Week 1-2)**
 1. **[Getting Started Guide](getting-started.md)** - Core platform concepts
 2. **[Running the Examples](running-examples.md)** - Hands-on exploration
-3. **[pagila-sqlmodel-basic](../pagila-implementations/pagila-sqlmodel-basic/)** - Study the complete implementation
+3. **[pagila-sqlmodel-basic](../pagila-implementations/pagila-sqlmodel-basic/README.md)** - Study the complete implementation
 
 **Learning Objectives:**
 - Understand platform-as-dependency pattern
