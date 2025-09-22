@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import DATE, TIMESTAMP, Column, ForeignKey, text
+from sqlalchemy import BOOLEAN, DATE, TIMESTAMP, Column, ForeignKey, text
 from sqlmodel import Field, SQLModel
 
 
@@ -21,7 +21,7 @@ class Customer(SQLModel, table=True):
         sa_column=Column(ForeignKey("public.address.address_id"), nullable=False)
     )
     activebool: bool = Field(
-        sa_column=Column(nullable=False, server_default=text("true")),
+        sa_column=Column(BOOLEAN, nullable=False, server_default=text("true")),
         default=True
     )
     create_date: date = Field(
