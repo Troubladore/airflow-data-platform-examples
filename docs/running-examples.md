@@ -1,8 +1,6 @@
 # Running the Examples - Complete Walkthrough
 
-This guide walks you through installing, testing, and exploring the Pagila schema deployment example to understand how the platform works in practice. You'll run unit/integration tests and explore schema deployment patterns.
-
-**Note**: Full Airflow orchestration with Bronze→Silver→Gold data flows is planned for future implementation.
+This guide walks you through installing, testing, and exploring the complete Pagila medallion architecture example to understand how the platform works in practice. You'll run unit/integration tests and explore the full Bronze→Silver→Gold data pipeline with Airflow orchestration.
 
 ## Prerequisites
 
@@ -190,22 +188,26 @@ dependencies = [
 deploy_data_objects(table_classes, target_config)
 ```
 
-## 🚧 What's Missing: Airflow Orchestration
+## 🏗️ Implemented: Complete Medallion Architecture
 
-**Current Status**: The examples demonstrate **schema deployment and validation** but do not yet include:
+**Current Status**: The examples now demonstrate **complete Bronze→Silver→Gold pipeline** including:
 
-- ❌ **Airflow DAGs** - Data pipeline orchestration
-- ❌ **Bronze layer implementation** - Warehouse ingestion from source
-- ❌ **Silver layer** - Business rules and data quality
-- ❌ **Gold layer** - Analytics and aggregations
-- ❌ **Data flows** - Actual data movement and transformation
+- ✅ **Airflow DAG** - Complete pipeline orchestration (`pagila_bronze_silver_gold_pipeline`)
+- ✅ **Bronze layer models** - Warehouse ingestion with audit fields (`BrCustomer`, `BrFilm`)
+- ✅ **Silver layer transformations** - Business rules and data quality validation
+- ✅ **Gold layer analytics** - Dimensional models and KPIs
+- ✅ **Data pipeline** - Full medallion architecture implementation
 
-**Planned Implementation**:
-- `pagila_bronze_ingestion` - Source → Bronze warehouse DAG
-- `pagila_silver_transformation` - Bronze → Silver business rules DAG
-- `pagila_gold_aggregation` - Silver → Gold analytics DAG
-- Airflow web UI at `https://airflow.local.troubladore.dev`
-- Complete data lineage and monitoring
+**Pipeline Components**:
+- **Bronze Layer**: `datakit_pagila_bronze/` with audit fields and lenient typing
+- **Orchestration**: `orchestration/pagila_bronze_silver_gold_dag.py` - Complete Airflow DAG
+- **Task Groups**: Bronze extraction → Silver transformation → Gold aggregation → Validation
+- **Schedule**: Daily at 6:00 AM UTC with proper task dependencies
+
+**To See the Pipeline**:
+1. Navigate to `pagila-implementations/pagila-sqlmodel-basic/orchestration/`
+2. Review the complete DAG implementation
+3. Deploy to Airflow to see Bronze→Silver→Gold data flows in action
 
 ## 🎯 What You've Accomplished
 
