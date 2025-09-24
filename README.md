@@ -1,48 +1,108 @@
 # Airflow Data Platform - Examples
 
-Working examples and implementation guides for the Airflow Data Platform. Contains business implementations using the platform framework as a dependency, demonstrating real-world data engineering patterns.
+Business implementations and learning examples for the Airflow Data Platform.
 
-This repository contains **examples and business implementations**. For the platform framework, see [airflow-data-platform](https://github.com/Troubladore/airflow-data-platform).
+This repository contains **examples** showing how to use the platform. For the platform framework itself, see [airflow-data-platform](https://github.com/Troubladore/airflow-data-platform).
 
-## 🏗️ Learning Journeys
+## 🚀 Start Here - Hello World Examples
 
-### **How to Use the Platform**
-1. **[Getting Started Guide](docs/getting-started.md)** - Core concepts and patterns
-2. **[Learning Path](docs/learning-path.md)** - Detailed study progression
+### **New to the Platform?**
+Start with these simple examples in order:
 
-### **Running the Examples**
-1. **[Running the Examples](docs/running-examples.md)** - Complete walkthrough of Pagila examples
-   - Install and validate examples
-   - Run unit/integration tests
-   - Explore complete Bronze→Silver→Gold pipeline with Airflow orchestration
+1. **[hello-world/](hello-world/)** - Basic Astronomer project with platform patterns
+   - Minimal setup
+   - Shows platform integration
+   - 5 minutes to running
 
-### **Ready to Build** (3 approaches)
-1. **[Fork & Customize](docs/implementation-guide.md)** - Start with examples, adapt for your business
-2. **[Green Field Setup](docs/business-setup-patterns.md)** - Build from scratch using platform patterns
-3. **[Migration Guide](docs/migration-guide.md)** - Move existing data workflows to platform
+2. **[hello-kerberos/](hello-kerberos/)** - SQL Server with Windows Authentication
+   - Kerberos ticket sharing
+   - Secure database connections
+   - No passwords in code
+
+## 📚 Learning Path
+
+### **Step 1: Platform Setup**
+First, set up the platform services:
+```bash
+# Clone and start platform services
+git clone https://github.com/Troubladore/airflow-data-platform.git
+cd airflow-data-platform/platform-bootstrap
+make start
+```
+See [Platform Setup Guide](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started-simple.md)
+
+### **Step 2: Try Hello World**
+```bash
+# Clone examples
+git clone https://github.com/Troubladore/airflow-data-platform-examples.git
+cd airflow-data-platform-examples/hello-world
+
+# Follow the README there
+```
+
+### **Step 3: Explore Real Examples**
+- **[pagila-implementations/](pagila-implementations/)** - Complete data pipeline examples
+- **[datakits-sqlserver/](datakits-sqlserver/)** - Production SQL Server patterns
+
+## 🏗️ Repository Structure
+
+```
+airflow-data-platform-examples/
+├── hello-world/                # Simplest possible example
+├── hello-kerberos/            # Kerberos authentication example
+├── pagila-implementations/     # Complete pipeline examples
+│   └── pagila-sqlmodel-basic/ # SQLModel implementation
+├── datakits-sqlserver/        # SQL Server production patterns
+│   ├── datakit_sqlserver_bronze_kerberos/
+│   └── datakit_sqlserver_silver/
+└── docs/                      # Detailed documentation
+```
 
 ## 📖 Documentation
 
-- **[Complete Documentation Index](docs/index.md)** - All guides and references
+### **Getting Started**
+- [Platform Setup](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started-simple.md) - Set up platform services
+- [Hello World](hello-world/) - Your first project
+- [Hello Kerberos](hello-kerberos/) - SQL Server authentication
 
-## 🏛️ Example Implementations
+### **Deep Dives**
+- [Running the Examples](docs/running-examples.md) - Complete walkthrough
+- [Learning Path](docs/learning-path.md) - Structured learning progression
+- [Implementation Guide](docs/implementation-guide.md) - Build your own
 
-### **Current Examples**
-- **[pagila-sqlmodel-basic](pagila-implementations/pagila-sqlmodel-basic/)** - Complete SQLModel implementation with source contracts and Bronze warehouse
+### **Patterns & Architecture**
+- [SQLModel Patterns](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/patterns/sqlmodel-patterns.md)
+- [Runtime Patterns](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/patterns/runtime-patterns.md)
+- [Business Setup Patterns](docs/business-setup-patterns.md)
 
-### **Planned Examples**
-- **pagila-dbt-advanced** - Full DBT transformation pipeline
-- **pagila-hybrid** - SQLModel bronze + DBT silver/gold
-- **pagila-streaming** - Real-time ingestion patterns
+## 🎯 Which Example Should I Use?
+
+| If you want to... | Start with... |
+|-------------------|---------------|
+| See if it works | [hello-world/](hello-world/) |
+| Connect to SQL Server | [hello-kerberos/](hello-kerberos/) |
+| Build a data pipeline | [pagila-sqlmodel-basic/](pagila-implementations/pagila-sqlmodel-basic/) |
+| Production SQL Server | [datakits-sqlserver/](datakits-sqlserver/) |
 
 ## 🤝 Contributing
 
-- **Implementation examples** - Share different approaches to common data problems
-- **Pattern documentation** - Explain when/why to use specific techniques
-- **Tutorial improvements** - Make learning easier for newcomers
+We welcome contributions! Especially:
+- **New examples** - Different databases, cloud providers, etc.
+- **Pattern documentation** - When/why to use specific approaches
+- **Tutorial improvements** - Make it easier for newcomers
 
-See the platform repository [CLAUDE.md](https://github.com/Troubladore/airflow-data-platform/blob/main/CLAUDE.md) for development patterns.
+## 🔧 Prerequisites
+
+All examples assume you have:
+1. Docker Desktop installed
+2. Python 3.8+ available
+3. Platform services running (see setup guide)
+
+For SQL Server examples, you'll also need:
+- WSL2 (Windows users)
+- Kerberos configuration
+- Access to a SQL Server instance
 
 ---
 
-**Questions?** Check the [documentation](docs/) or create an issue for support.
+**Questions?** Start with [hello-world/](hello-world/) or create an issue for help.

@@ -1,0 +1,228 @@
+version: '3.8'
+
+# Full Stack SQL Server Bronze Ingestion with Kerberos
+# =====================================================
+# Integrates all three layers:
+# - Layer 1: Platform (Airflow + Kerberos from registry)
+# - Layer 2: Datakits (Source and Bronze processing)
+# - Layer 3: Warehouse (Bronze/Silver/Gold storage)
+
+networks:
+  platform-network:
+    driver: bridge
+    name: platform-net
+  warehouse-network:
+    driver: bridge
+    name: warehouse-net
+
+volumes:
+  krb5_cache:
+    name: krb5_cache
+  krb5_conf:
+    name: krb5_conf
+  airflow_logs:
+  airflow_plugins:
+  postgres_data:
+  bronze_warehouse_data:
+
+services:
+  # ==========================================
+  # LAYER 1: PLATFORM (From Registry)
+  # ==========================================
+
+  # Kerberos Sidecar from Platform Registry
+  kerberos-sidecar:
+    image: registry.localhost/platform/kerberos-sidecar:latest
+    container_name: kerberos-sidecar
+    environment:
+      KRB_PRINCIPAL: ${KRB_PRINCIPAL:-svc_airflow@COMPANY.COM}
+      KRB_REALM: ${KRB_REALM:-COMPANY.COM}
+      KRB_KEYTAB_PATH: /krb5/keytabs/airflow.keytab
+      KRB_RENEWAL_INTERVAL: ${KRB_RENEWAL_INTERVAL:-3600}
+      # For dev/test with password
+      USE_PASSWORD: ${USE_PASSWORD:-false}
+      KRB_PASSWORD: ${KRB_PASSWORD}
+    volumes:
+      - ${KRB5_CONF_HOST:-/etc/krb5.conf}:/krb5/conf/krb5.conf:ro
+      - ${KRB_KEYTAB_HOST:-./config/airflow.keytab}:/krb5/keytabs/airflow.keytab:ro
+      - krb5_cache:/krb5/cache:rw
+    networks:
+      - platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "klist", "-s"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Astronomer Airflow with Kerberos Support from Registry
+  airflow-webserver:
+    image: registry.localhost/platform/astronomer-kerberos:latest
+    container_name: airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-verysecretkey}
+      KRB5_CONFIG: /etc/krb5.conf
+      KRB5CCNAME: /krb5/cache/krb5cc
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes:
+      - ${KRB5_CONF_HOST:-/etc/krb5.conf}:/etc/krb5.conf:ro
+      - krb5_cache:/krb5/cache:ro
+      - ./dags:/usr/local/airflow/dags:ro
+      - ./plugins:/usr/local/airflow/plugins:ro
+      - airflow_logs:/usr/local/airflow/logs
+    ports:
+      - "8080:8080"
+    networks:
+      - platform-network
+      - warehouse-network
+    depends_on:
+      - postgres
+      - kerberos-sidecar
+    command: webserver
+
+  airflow-scheduler:
+    image: registry.localhost/platform/astronomer-kerberos:latest
+    container_name: airflow-scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
+      KRB5_CONFIG: /etc/krb5.conf
+      KRB5CCNAME: /krb5/cache/krb5cc
+      # SQL Server connection for Bronze ingestion
+      MSSQL_SERVER: ${MSSQL_SERVER:-sql.company.com}
+      MSSQL_DATABASE: ${MSSQL_DATABASE:-DataWarehouse}
+      MSSQL_AUTH_TYPE: kerberos
+    volumes:
+      - ${KRB5_CONF_HOST:-/etc/krb5.conf}:/etc/krb5.conf:ro
+      - krb5_cache:/krb5/cache:ro
+      - ./dags:/usr/local/airflow/dags:ro
+      - ./plugins:/usr/local/airflow/plugins:ro
+      - airflow_logs:/usr/local/airflow/logs
+      # Mount Layer 2 datakits
+      - ../datakit_sqlserver_bronze_kerberos:/opt/datakits/bronze:ro
+      - ../datakit_sqlserver_source:/opt/datakits/source:ro
+    networks:
+      - platform-network
+      - warehouse-network
+    depends_on:
+      - postgres
+      - kerberos-sidecar
+    command: scheduler
+
+  # Airflow Metadata Database
+  postgres:
+    image: postgres:15
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - platform-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # LAYER 2: DATAKITS (Processing Containers)
+  # ==========================================
+
+  # Source Datakit - SQL Server Connection
+  datakit-sqlserver-source:
+    build:
+      context: ./datakit_sqlserver_source
+      dockerfile: Dockerfile
+    image: datakit-sqlserver-source:latest
+    container_name: datakit-sqlserver-source
+    environment:
+      KRB5_CONFIG: /etc/krb5.conf
+      KRB5CCNAME: /krb5/cache/krb5cc
+      MSSQL_SERVER: ${MSSQL_SERVER:-sql.company.com}
+      MSSQL_DATABASE: ${MSSQL_DATABASE:-DataWarehouse}
+      MSSQL_AUTH_TYPE: kerberos
+    volumes:
+      - ${KRB5_CONF_HOST:-/etc/krb5.conf}:/etc/krb5.conf:ro
+      - krb5_cache:/krb5/cache:ro
+    networks:
+      - platform-network
+      - warehouse-network
+    depends_on:
+      - kerberos-sidecar
+
+  # Bronze Datakit - ETL Processing
+  datakit-sqlserver-bronze:
+    build:
+      context: ./datakit_sqlserver_bronze_kerberos
+      dockerfile: Dockerfile
+    image: datakit-sqlserver-bronze:latest
+    container_name: datakit-sqlserver-bronze
+    environment:
+      KRB5_CONFIG: /etc/krb5.conf
+      KRB5CCNAME: /krb5/cache/krb5cc
+      # Source connection
+      MSSQL_SERVER: ${MSSQL_SERVER:-sql.company.com}
+      MSSQL_DATABASE: ${MSSQL_DATABASE:-DataWarehouse}
+      MSSQL_AUTH_TYPE: kerberos
+      # Bronze target
+      BRONZE_HOST: bronze-warehouse
+      BRONZE_PORT: 5432
+      BRONZE_DATABASE: bronze
+      BRONZE_USER: bronze_user
+      BRONZE_PASSWORD: bronze_pass
+    volumes:
+      - ${KRB5_CONF_HOST:-/etc/krb5.conf}:/etc/krb5.conf:ro
+      - krb5_cache:/krb5/cache:ro
+    networks:
+      - platform-network
+      - warehouse-network
+    depends_on:
+      - kerberos-sidecar
+      - bronze-warehouse
+
+  # ==========================================
+  # LAYER 3: WAREHOUSE (From warehouse.yml)
+  # ==========================================
+
+  bronze-warehouse:
+    extends:
+      file: ./layer3-warehouse/docker-compose.warehouse.yml
+      service: bronze-warehouse
+    networks:
+      - warehouse-network
+
+  silver-warehouse:
+    extends:
+      file: ./layer3-warehouse/docker-compose.warehouse.yml
+      service: silver-warehouse
+    networks:
+      - warehouse-network
+
+  gold-warehouse:
+    extends:
+      file: ./layer3-warehouse/docker-compose.warehouse.yml
+      service: gold-warehouse
+    networks:
+      - warehouse-network
+
+  # ==========================================
+  # OPTIONAL: Test SQL Server (for development)
+  # ==========================================
+
+  test-sqlserver:
+    extends:
+      file: ./examples/docker-compose.mock.yml
+      service: mock-sqlserver
+    profiles: ["test"]  # Only starts with --profile test
+    networks:
+      - platform-network

@@ -1,0 +1,252 @@
+# Helm Values Override for Astronomer Platform
+# ==============================================
+# Use with: helm install astronomer astronomer/astronomer -f helm-values-override.yaml
+
+# Global configuration
+global:
+  # Use your Artifactory instead of Docker Hub
+  registry:
+    url: artifactory.company.com
+    repository: astronomer-certified
+    pullPolicy: IfNotPresent
+
+  # Base domain for your platform
+  baseDomain: airflow.company.com
+
+  # TLS configuration
+  tlsSecret: astronomer-platform-tls
+
+  # Auth configuration (integrate with company SSO)
+  auth:
+    openid:
+      enabled: true
+      discoveryUrl: https://sso.company.com/.well-known/openid-configuration
+      clientId: astronomer-platform
+      clientSecret: ${SSO_CLIENT_SECRET}
+
+# Houston API configuration
+houston:
+  config:
+    # Limit base images to Artifactory only
+    deployments:
+      registry:
+        url: artifactory.company.com
+        repository: airflow-deployments
+
+      # Restrict runtime versions to vetted ones
+      runtimeVersions:
+        - version: 11.10.0
+          label: "11.10.0 (Vetted)"
+          artifactory_path: "astronomer-certified/ap-airflow:11.10.0"
+
+    # Integrate with Delinea for secrets
+    secrets:
+      backend: delinea
+      backend_kwargs:
+        vault_url: ${DELINEA_VAULT_URL}
+        vault_namespace: airflow
+
+    # Email configuration
+    email:
+      enabled: true
+      smtpHost: smtp.company.com
+      smtpPort: 587
+      smtpUser: airflow@company.com
+
+# Astronomer platform components
+astronomer:
+  # Commander (handles deployments)
+  commander:
+    env:
+      - name: COMMANDER_REGISTRY_URL
+        value: artifactory.company.com
+      - name: COMMANDER_REGISTRY_INSECURE
+        value: "false"
+
+    # Use company CA certificates
+    volumeMounts:
+      - name: ca-certificates
+        mountPath: /usr/local/share/ca-certificates
+        readOnly: true
+
+    volumes:
+      - name: ca-certificates
+        configMap:
+          name: company-ca-bundle
+
+  # Registry (proxies to Artifactory)
+  registry:
+    persistence:
+      enabled: true
+      size: 100Gi
+
+    # Proxy configuration to Artifactory
+    proxy:
+      enabled: true
+      remoteurl: https://artifactory.company.com
+      username: ${ARTIFACTORY_USERNAME}
+      password: ${ARTIFACTORY_PASSWORD}
+
+  # Grafana monitoring
+  grafana:
+    enabled: true
+    ingress:
+      enabled: true
+      host: grafana.airflow.company.com
+
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    retention: 30d
+    persistence:
+      size: 100Gi
+
+  # Elasticsearch logging
+  elasticsearch:
+    enabled: true
+    replicas: 3
+    persistence:
+      size: 200Gi
+
+  # NGINX ingress
+  nginx:
+    enabled: true
+    class: nginx
+
+    # Company-specific annotations
+    annotations:
+      cert-manager.io/cluster-issuer: company-ca-issuer
+      nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+
+# Platform-level Kerberos sidecar
+kerberosSidecar:
+  enabled: true
+  image: artifactory.company.com/platform/kerberos-sidecar:v1.0.0
+
+  env:
+    - name: DELINEA_VAULT_URL
+      value: ${DELINEA_VAULT_URL}
+    - name: KRB_REALM
+      value: COMPANY.COM
+    - name: RENEWAL_INTERVAL
+      value: "3600"
+
+  # Mount keytab from Delinea-synced secret
+  volumeMounts:
+    - name: keytab
+      mountPath: /krb5/keytabs
+      readOnly: true
+
+  volumes:
+    - name: keytab
+      secret:
+        secretName: platform-kerberos-keytab
+
+# Node selectors for platform components
+nodeSelector:
+  workload: platform
+  zone: platform
+
+# Resource limits for platform namespace
+resources:
+  houston:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+  commander:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  registry:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Multi-tenancy configuration
+tenants:
+  # Create these namespaces
+  namespaces:
+    - airflow-finance
+    - airflow-marketing
+    - airflow-analytics
+    - airflow-operations
+
+  # Default resources per tenant
+  defaultResources:
+    scheduler:
+      cpu: 500m
+      memory: 1Gi
+    webserver:
+      cpu: 500m
+      memory: 1Gi
+    workers:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Default node selector per tenant
+  defaultNodeSelector:
+    workload: tenant
+
+# Security policies
+securityContext:
+  runAsUser: 50000
+  runAsGroup: 50000
+  fsGroup: 50000
+
+podSecurityPolicy:
+  enabled: true
+
+networkPolicies:
+  enabled: true
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+  destination: s3://company-backups/astronomer
+
+# High Availability
+highAvailability:
+  enabled: true
+  houston:
+    replicas: 3
+  commander:
+    replicas: 2
+  registry:
+    replicas: 2
+
+# Custom CA certificates
+customCACerts:
+  enabled: true
+  configMapName: company-ca-bundle
+
+# Platform monitoring
+monitoring:
+  # Send metrics to company Datadog
+  datadog:
+    enabled: true
+    apiKey: ${DATADOG_API_KEY}
+    tags:
+      - "platform:astronomer"
+      - "environment:production"
+
+  # Alert manager configuration
+  alertmanager:
+    enabled: true
+    config:
+      receivers:
+        - name: platform-team
+          email_configs:
+            - to: platform-team@company.com

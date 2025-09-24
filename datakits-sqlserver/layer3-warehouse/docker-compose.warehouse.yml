@@ -1,0 +1,82 @@
+version: '3.8'
+
+# Layer 3: Warehouse Definition for SQL Server Bronze/Silver/Gold
+# ================================================================
+# This defines the warehouse layer that receives data from Layer 2 datakits
+
+services:
+  # Bronze Warehouse (PostgreSQL for this example, could be S3/ADLS in prod)
+  bronze-warehouse:
+    image: postgres:15
+    container_name: sqlserver-bronze-warehouse
+    environment:
+      POSTGRES_DB: bronze
+      POSTGRES_USER: bronze_user
+      POSTGRES_PASSWORD: bronze_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=en_US.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - bronze_warehouse_data:/var/lib/postgresql/data
+      - ./init-scripts/bronze-init.sql:/docker-entrypoint-initdb.d/01-bronze-init.sql:ro
+    networks:
+      - warehouse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bronze_user -d bronze"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Silver Warehouse (Separate schema in same DB for simplicity)
+  silver-warehouse:
+    image: postgres:15
+    container_name: sqlserver-silver-warehouse
+    environment:
+      POSTGRES_DB: silver
+      POSTGRES_USER: silver_user
+      POSTGRES_PASSWORD: silver_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=en_US.UTF-8"
+    ports:
+      - "5433:5432"
+    volumes:
+      - silver_warehouse_data:/var/lib/postgresql/data
+      - ./init-scripts/silver-init.sql:/docker-entrypoint-initdb.d/01-silver-init.sql:ro
+    networks:
+      - warehouse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U silver_user -d silver"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Gold Warehouse (Analytics-ready)
+  gold-warehouse:
+    image: postgres:15
+    container_name: sqlserver-gold-warehouse
+    environment:
+      POSTGRES_DB: gold
+      POSTGRES_USER: gold_user
+      POSTGRES_PASSWORD: gold_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=en_US.UTF-8"
+    ports:
+      - "5434:5432"
+    volumes:
+      - gold_warehouse_data:/var/lib/postgresql/data
+      - ./init-scripts/gold-init.sql:/docker-entrypoint-initdb.d/01-gold-init.sql:ro
+    networks:
+      - warehouse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gold_user -d gold"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bronze_warehouse_data:
+  silver_warehouse_data:
+  gold_warehouse_data:
+
+networks:
+  warehouse-network:
+    driver: bridge
+    name: sqlserver-warehouse-net
