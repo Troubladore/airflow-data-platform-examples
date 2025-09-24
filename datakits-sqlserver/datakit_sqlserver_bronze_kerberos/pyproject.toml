@@ -1,0 +1,37 @@
+[project]
+name = "datakit-sqlserver-bronze-kerberos"
+version = "0.1.0"
+description = "SQL Server Bronze ingestion datakit with Kerberos/NT Authentication"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    # Platform dependency
+    "sqlmodel-framework @ git+https://github.com/Troubladore/airflow-data-platform.git@main#subdirectory=data-platform/sqlmodel-workspace/sqlmodel-framework",
+
+    # Core dependencies
+    "sqlmodel>=0.0.25",
+    "sqlalchemy>=2.0.0",
+    "pyodbc>=5.1.0",
+    "pandas>=2.0.0",
+
+    # Logging and configuration
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+
+    # CLI
+    "typer>=0.9.0",
+]
+
+[project.scripts]
+datakit-sqlserver = "datakit_sqlserver_bronze:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

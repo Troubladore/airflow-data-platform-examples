@@ -1,0 +1,87 @@
+version: '3.8'
+
+# Mock Environment for Testing Bronze Ingestion
+# ==============================================
+# This creates a complete test environment with:
+# - Mock SQL Server with sample data
+# - Mock Kerberos KDC (optional)
+# - Bronze storage location
+
+services:
+  # Mock SQL Server with TestWarehouse database
+  mock-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mock-sqlserver
+    hostname: sqlserver.mock.local
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrong@Password123"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - ./mock_warehouse_setup.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mock_sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "YourStrong@Password123", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bronze-test
+
+  # Initialize the mock database with sample data
+  mock-data-loader:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: mock-data-loader
+    depends_on:
+      mock-sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./mock_warehouse_setup.sql:/init.sql:ro
+    command: >
+      /bin/bash -c "
+        echo 'Waiting for SQL Server to be ready...';
+        sleep 10;
+        echo 'Creating mock database and table...';
+        /opt/mssql-tools/bin/sqlcmd -S mock-sqlserver -U sa -P 'YourStrong@Password123' -i /init.sql;
+        echo 'Mock data loaded successfully!';
+      "
+    networks:
+      - bronze-test
+
+  # Optional: Mock Kerberos KDC for testing Kerberos auth
+  # Uncomment if you want to test Kerberos without a real domain
+  # mock-kdc:
+  #   image: gcavalcante8808/krb5-server:latest
+  #   container_name: mock-kdc
+  #   hostname: kdc.mock.local
+  #   environment:
+  #     KRB5_REALM: MOCK.LOCAL
+  #     KRB5_KDC: kdc.mock.local
+  #     KRB5_ADMIN_SERVER: kdc.mock.local
+  #   networks:
+  #     - bronze-test
+
+  # Bronze storage (using PostgreSQL as an example)
+  bronze-storage:
+    image: postgres:15
+    container_name: bronze-storage
+    environment:
+      POSTGRES_DB: bronze
+      POSTGRES_USER: bronze_user
+      POSTGRES_PASSWORD: bronze_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - bronze_data:/var/lib/postgresql/data
+    networks:
+      - bronze-test
+
+volumes:
+  mock_sqlserver_data:
+  bronze_data:
+
+networks:
+  bronze-test:
+    driver: bridge

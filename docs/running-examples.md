@@ -214,26 +214,91 @@ deploy_data_objects(table_classes, target_config)
    ./layer1-platform/docker/start-pagila-db.sh
    ```
 
-2. **Deploy Bronze/Silver schemas**:
+2. **Create medallion architecture schemas**:
    ```bash
    cd pagila-implementations/pagila-sqlmodel-basic
 
-   # Deploy Bronze schema
+   # Create Bronze/Silver/Gold schemas in Pagila database
    PYTHONPATH="./src:$PYTHONPATH" uv run python -c "
-   from sqlmodel_framework.utils.deployment import deploy_data_objects
-   from datakits.datakit_pagila_bronze.models import BrCustomer, BrFilm, BrIngestionError
-   # Deploy to your target database
-   "
-
-   # Deploy Silver schema
-   PYTHONPATH="./src:$PYTHONPATH" uv run python -c "
-   from sqlmodel_framework.utils.deployment import deploy_data_objects
-   from datakits.datakit_pagila_silver.models import SlCustomer, SlTransformationError
-   # Deploy to your target database
+   from sqlalchemy import create_engine, text
+   conn_string = 'postgresql://postgres:pagila_demo_password@localhost:15432/pagila'
+   engine = create_engine(conn_string)
+   schemas = ['staging_pagila', 'silver_pagila', 'gold_pagila']
+   with engine.connect() as conn:
+       for schema in schemas:
+           print(f'Creating schema: {schema}')
+           conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS {schema}'))
+       conn.commit()
+   print('✅ All medallion schemas created!')
    "
    ```
 
-3. **Copy DAG to Airflow** (if using local Airflow installation):
+3. **🧪 Test Complete Pipeline (Airflow-Independent)**:
+
+   **This critical step validates your medallion architecture works before setting up Airflow!**
+
+   ```bash
+   # Test Bronze extraction from Pagila source
+   PYTHONPATH="./src:$PYTHONPATH" uv run python -c "
+   from datakits.datakit_pagila_bronze.transforms.pagila_to_bronze import extract_pagila_to_bronze_tables
+
+   result = extract_pagila_to_bronze_tables(
+       source_conn='postgresql://postgres:pagila_demo_password@localhost:15432/pagila',
+       bronze_conn='postgresql://postgres:pagila_demo_password@localhost:15432/pagila',
+       batch_id='test_$(date +%Y%m%d)'
+   )
+
+   print(f'🥉 BRONZE: {result[\"tables_processed\"]} tables, {result[\"total_records\"]} records')
+   print(f'   Success Rate: {result[\"success_rate\"]:.1f}%')
+   "
+
+   # Test Silver transformation with quarantine system
+   PYTHONPATH="./src:$PYTHONPATH" uv run python -c "
+   from datakits.datakit_pagila_silver.transforms.bronze_to_silver import transform_bronze_to_silver_tables
+
+   result = transform_bronze_to_silver_tables(
+       bronze_conn='postgresql://postgres:pagila_demo_password@localhost:15432/pagila',
+       silver_conn='postgresql://postgres:pagila_demo_password@localhost:15432/pagila',
+       batch_id='test_$(date +%Y%m%d)'
+   )
+
+   print(f'🥈 SILVER: {result[\"total_records_promoted\"]} promoted, {result[\"total_records_quarantined\"]} quarantined')
+   print(f'   Success Rate: {result[\"success_rate\"]:.1f}%')
+   "
+
+   # Test Gold aggregation and analytics
+   PYTHONPATH="./src:$PYTHONPATH" uv run python -c "
+   from datakits.datakit_pagila_gold.transforms.silver_to_gold import aggregate_silver_to_gold_tables
+
+   result = aggregate_silver_to_gold_tables(
+       silver_conn='postgresql://postgres:pagila_demo_password@localhost:15432/pagila',
+       gold_conn='postgresql://postgres:pagila_demo_password@localhost:15432/pagila',
+       batch_id='test_$(date +%Y%m%d)'
+   )
+
+   print(f'🥇 GOLD: {result[\"objects_processed\"]} objects, {result[\"total_records_created\"]} records')
+   print(f'   Success Rate: {result[\"success_rate\"]:.1f}%')
+   "
+   ```
+
+   **Expected Output:**
+   ```
+   🥉 BRONZE: 3 tables, 17332 records
+      Success Rate: 100.0%
+   🥈 SILVER: 599 promoted, 0 quarantined
+      Success Rate: 100.0%
+   🥇 GOLD: 3 objects, 8270 records
+      Success Rate: 100.0%
+   ```
+
+   **🎯 What This Proves:**
+   - ✅ Complete Bronze→Silver→Gold data pipeline works independently
+   - ✅ Transformation functions ready for Airflow containerization
+   - ✅ No dependency conflicts between platform and orchestration
+   - ✅ Real data flowing through medallion architecture
+   - ✅ Industry standard patterns (lenient Bronze, quarantine system, analytics)
+
+4. **Copy DAG to Airflow** (when ready for full orchestration):
    ```bash
    cp orchestration/pagila_bronze_silver_gold_dag.py $AIRFLOW_HOME/dags/
    ```
