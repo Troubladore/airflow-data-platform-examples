@@ -6,14 +6,18 @@ readme = "README.md"
 requires-python = "==3.12.11"
 dependencies = [
     # Platform dependency - will be installed from git
-    "sqlmodel-framework @ git+https://github.com/Troubladore/airflow-data-platform.git@feature/layer2-data-processing-v2#subdirectory=data-platform/sqlmodel-workspace/sqlmodel-framework",
+    "sqlmodel-framework @ git+https://github.com/Troubladore/airflow-data-platform.git@main#subdirectory=data-platform/sqlmodel-workspace/sqlmodel-framework",
 
     # Business-specific dependencies
     "sqlmodel>=0.0.25",
     "psycopg2-binary>=2.9.9",
+
+    # Data processing dependencies (for transformation containers)
+    "pandas>=2.0.0",
 ]
 
 [project.optional-dependencies]
+
 dev = [
     "pytest>=7.4.3",
     "pytest-cov>=4.1.0",

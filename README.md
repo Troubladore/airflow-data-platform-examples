@@ -1,116 +1,108 @@
-# Airflow Data Platform - Examples & Getting Started
+# Airflow Data Platform - Examples
 
-Welcome to the **learning hub** for the Airflow Data Platform! This repository contains working examples, tutorials, and implementation guides to help you build your business data infrastructure.
+Business implementations and learning examples for the Airflow Data Platform.
 
-## 🚀 Quick Start
+This repository contains **examples** showing how to use the platform. For the platform framework itself, see [airflow-data-platform](https://github.com/Troubladore/airflow-data-platform).
 
-```bash
-git clone https://github.com/Troubladore/airflow-data-platform-examples.git
-cd airflow-data-platform-examples/pagila-implementations/pagila-sqlmodel-basic
-uv sync  # Platform installs automatically!
-```
+## 🚀 Start Here - Hello World Examples
 
-This gives you a **complete working example** that demonstrates the platform patterns.
+### **New to the Platform?**
+Start with these simple examples in order:
+
+1. **[hello-world/](hello-world/)** - Basic Astronomer project with platform patterns
+   - Minimal setup
+   - Shows platform integration
+   - 5 minutes to running
+
+2. **[hello-kerberos/](hello-kerberos/)** - SQL Server with Windows Authentication
+   - Kerberos ticket sharing
+   - Secure database connections
+   - No passwords in code
 
 ## 📚 Learning Path
 
-### 👋 **New to the Platform?**
-1. **[Getting Started Guide](./docs/GETTING-STARTED.md)** - Your first 15 minutes
-2. **[Basic Example](./pagila-implementations/pagila-sqlmodel-basic/)** - Working SQLModel patterns
-3. **[Implementation Guide](./docs/IMPLEMENTATION-GUIDE.md)** - Build your business version
+### **Step 1: Platform Setup**
+First, set up the platform services:
+```bash
+# Clone and start platform services
+git clone https://github.com/Troubladore/airflow-data-platform.git
+cd airflow-data-platform/platform-bootstrap
+make start
+```
+See [Platform Setup Guide](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started-simple.md)
 
-### 🏗️ **Ready to Build?**
-1. **[Business Setup Patterns](./docs/BUSINESS-SETUP-PATTERNS.md)** - Repository structure
-2. **[Schema Design Patterns](./docs/PATTERNS.md)** - Common data modeling approaches
-3. **[Deployment Guide](./docs/DEPLOYMENT-GUIDE.md)** - Production deployment
+### **Step 2: Try Hello World**
+```bash
+# Clone examples
+git clone https://github.com/Troubladore/airflow-data-platform-examples.git
+cd airflow-data-platform-examples/hello-world
 
-### 🎯 **Advanced Patterns?**
-- Multiple implementation examples (coming soon!)
-- Hybrid SQLModel + DBT patterns
-- Custom execution engine examples
-
-## 💡 Philosophy: Platform as Dependency
-
-The key insight: **Import the platform, don't fork it!**
-
-```toml
-# Your business pyproject.toml
-[dependencies]
-sqlmodel-framework = {git = "https://github.com/Troubladore/airflow-data-platform.git", branch = "main", subdirectory = "data-platform/sqlmodel-workspace/sqlmodel-framework"}
+# Follow the README there
 ```
 
-**Benefits:**
-- ✅ Platform updates via `uv sync` (no merge conflicts!)
-- ✅ Focus on your business data, not framework maintenance
-- ✅ Share patterns across teams without coupling
-- ✅ Contribute improvements back to platform
+### **Step 3: Explore Real Examples**
+- **[pagila-implementations/](pagila-implementations/)** - Complete data pipeline examples
+- **[datakits-sqlserver/](datakits-sqlserver/)** - Production SQL Server patterns
 
-## 🏛️ **Example Implementations**
+## 🏗️ Repository Structure
 
-### **Current Examples**
-- **[pagila-sqlmodel-basic](./pagila-implementations/pagila-sqlmodel-basic/)**
-  - Pure SQLModel approach
-  - Source contracts + Bronze warehouse
-  - Complete working deployment
-  - Perfect starting point
+```
+airflow-data-platform-examples/
+├── hello-world/                # Simplest possible example
+├── hello-kerberos/            # Kerberos authentication example
+├── pagila-implementations/     # Complete pipeline examples
+│   └── pagila-sqlmodel-basic/ # SQLModel implementation
+├── datakits-sqlserver/        # SQL Server production patterns
+│   ├── datakit_sqlserver_bronze_kerberos/
+│   └── datakit_sqlserver_silver/
+└── docs/                      # Detailed documentation
+```
 
-### **Planned Examples**
-- **pagila-dbt-advanced** - Full DBT transformation pipeline
-- **pagila-hybrid** - SQLModel bronze + DBT silver/gold
-- **pagila-streaming** - Real-time ingestion with Kafka
-- **pagila-multiwarehouse** - Cross-database deployment
-- **pagila-minimal** - Simplest possible implementation
+## 📖 Documentation
 
-Each example solves the **same business problem** (Pagila DVD rental) using **different technical approaches**, so you can compare and choose what fits your needs.
+### **Getting Started**
+- [Platform Setup](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started-simple.md) - Set up platform services
+- [Hello World](hello-world/) - Your first project
+- [Hello Kerberos](hello-kerberos/) - SQL Server authentication
 
-## 🎓 **What You'll Learn**
+### **Deep Dives**
+- [Running the Examples](docs/running-examples.md) - Complete walkthrough
+- [Learning Path](docs/learning-path.md) - Structured learning progression
+- [Implementation Guide](docs/implementation-guide.md) - Build your own
 
-### **Data Architecture Patterns**
-- Source schema contracts vs warehouse tables
-- Bronze → Silver → Gold data progression
-- Multi-source schema naming conventions
-- Audit fields and data lineage
+### **Patterns & Architecture**
+- [SQLModel Patterns](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/patterns/sqlmodel-patterns.md)
+- [Runtime Patterns](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/patterns/runtime-patterns.md)
+- [Business Setup Patterns](docs/business-setup-patterns.md)
 
-### **SQLModel Framework**
-- Table mixins for consistent patterns
-- Abstract base classes and inheritance
-- Schema-aware deployment utilities
-- Multi-database target support
+## 🎯 Which Example Should I Use?
 
-### **Development Workflow**
-- UV workspace management
-- Git dependency patterns
-- Environment-specific configurations
-- Testing and validation approaches
+| If you want to... | Start with... |
+|-------------------|---------------|
+| See if it works | [hello-world/](hello-world/) |
+| Connect to SQL Server | [hello-kerberos/](hello-kerberos/) |
+| Build a data pipeline | [pagila-sqlmodel-basic/](pagila-implementations/pagila-sqlmodel-basic/) |
+| Production SQL Server | [datakits-sqlserver/](datakits-sqlserver/) |
 
-### **Production Deployment**
-- Docker containerization
-- Airflow orchestration patterns
-- Multi-environment promotion
-- Monitoring and alerting
+## 🤝 Contributing
 
-## 🔗 **Related Repositories**
+We welcome contributions! Especially:
+- **New examples** - Different databases, cloud providers, etc.
+- **Pattern documentation** - When/why to use specific approaches
+- **Tutorial improvements** - Make it easier for newcomers
 
-- **[Platform Repository](https://github.com/Troubladore/airflow-data-platform)** - Framework source code & technical docs
-- **[Your Business Repo]** - Follow examples to build your implementation!
+## 🔧 Prerequisites
 
-## 🤝 **Contributing**
+All examples assume you have:
+1. Docker Desktop installed
+2. Python 3.8+ available
+3. Platform services running (see setup guide)
 
-Found a useful pattern? Share it!
-
-1. **Implementation examples** - Show different approaches to common problems
-2. **Pattern documentation** - Explain when/why to use specific techniques
-3. **Troubleshooting guides** - Help others avoid common pitfalls
-4. **Tutorial improvements** - Make learning easier for newcomers
-
-## 💪 **Success Stories**
-
-*"We went from idea to production data warehouse in 2 weeks using the basic SQLModel pattern. The platform handled all the infrastructure complexity."* - Data Team Lead
-
-*"Platform updates flow seamlessly via uv sync. We get framework improvements without merge conflicts or breaking changes."* - Senior Data Engineer
-
-*"The examples repository became our team's training ground. New hires can see working patterns immediately."* - Engineering Manager
+For SQL Server examples, you'll also need:
+- WSL2 (Windows users)
+- Kerberos configuration
+- Access to a SQL Server instance
 
 ---
 
-**Ready to build your data platform?** Start with the [Getting Started Guide](./docs/GETTING-STARTED.md)! 🚀
+**Questions?** Start with [hello-world/](hello-world/) or create an issue for help.

@@ -1,0 +1,13 @@
+# OpenMetadata Ingestion Dependencies
+# ====================================
+# Python packages for metadata ingestion DAGs
+
+# OpenMetadata Python SDK with database connectors
+openmetadata-ingestion[postgres,mssql]==1.2.0
+
+# Additional dependencies for SQL Server with Kerberos
+pyodbc>=5.0.0
+
+# Database drivers (included in SDK but listed for clarity)
+# psycopg2-binary  # PostgreSQL (included in openmetadata-ingestion[postgres])
+# pymssql          # SQL Server (included in openmetadata-ingestion[mssql])

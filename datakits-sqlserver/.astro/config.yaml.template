@@ -1,0 +1,245 @@
+# Astronomer Project Configuration Template
+# ==========================================
+# This configures how the project works with Astronomer Platform
+# Copy to config.yaml and customize for your organization
+
+project:
+  name: sqlserver-bronze-datakits
+  description: SQL Server Bronze ingestion with Kerberos authentication
+
+# Base image from your Artifactory (vetted by security)
+airflow:
+  image:
+    # Use your company's Artifactory URL
+    repository: ${ARTIFACTORY_URL}/astronomer-certified/ap-airflow
+    tag: 11.10.0-python-3.10
+
+    # Build args passed to Dockerfile
+    build_args:
+      ARTIFACTORY_URL: ${ARTIFACTORY_URL}
+      PLATFORM_VERSION: v1.0.0
+
+# Local development settings
+local:
+  # Environment variables for local development
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - ENVIRONMENT=local
+    - ARTIFACTORY_URL=${ARTIFACTORY_URL}
+    - KRB5CCNAME=/tmp/krb5cc
+
+  # Volumes for local development
+  volumes:
+    # Mount datakits for hot-reload development
+    - ./datakit_sqlserver_bronze_kerberos:/opt/airflow/datakits/bronze:ro
+    - ./datakit_sqlserver_source:/opt/airflow/datakits/source:ro
+
+    # Mount local Kerberos config
+    - ${HOME}/.krb5/cache:/tmp/krb5cc:ro
+    - /etc/krb5.conf:/etc/krb5.conf:ro
+
+    # Mount DAGs and plugins
+    - ./dags:/usr/local/airflow/dags:rw
+    - ./plugins:/usr/local/airflow/plugins:ro
+
+  # Ports for local services
+  ports:
+    - 8080:8080  # Airflow webserver
+    - 5432:5432  # PostgreSQL (if needed)
+
+# Deployment settings (for astro deploy)
+deployment:
+  # Target deployment (set via environment or CLI)
+  id: ${ASTRONOMER_DEPLOYMENT_ID}
+
+  # Workspace (tenant namespace)
+  workspace: ${ASTRONOMER_WORKSPACE}
+
+  # Resources for production
+  resources:
+    scheduler:
+      cpu: 500m
+      memory: 1Gi
+    webserver:
+      cpu: 500m
+      memory: 1Gi
+    workers:
+      cpu: 1000m
+      memory: 2Gi
+      replicas: 2
+
+# Registry configuration
+registry:
+  # Your Artifactory instance
+  url: ${ARTIFACTORY_URL}
+
+  # Repository paths
+  repositories:
+    base_images: astronomer-certified
+    datakits: airflow-datakits
+    platform: platform-extensions
+
+  # Authentication (use env vars for security)
+  auth:
+    username: ${ARTIFACTORY_USERNAME}
+    password: ${ARTIFACTORY_PASSWORD}
+
+  # Image pull policy
+  pull_policy: IfNotPresent
+
+# Kubernetes settings (for non-local environments)
+kubernetes:
+  # Namespace pattern for tenants
+  namespace_template: "airflow-{{ .Tenant }}"
+
+  # Service account for pods
+  service_account: airflow-runner
+
+  # Secrets to mount
+  secrets:
+    - name: kerberos-keytab
+      mount_path: /krb5/keytabs
+    - name: artifactory-creds
+      mount_path: /etc/docker
+
+  # ConfigMaps to mount
+  config_maps:
+    - name: krb5-config
+      mount_path: /etc/krb5.conf
+      sub_path: krb5.conf
+
+  # Node selectors for pod placement
+  node_selector:
+    workload: airflow
+    environment: "{{ .Environment }}"
+
+# Datakit configuration
+datakits:
+  # Registry path for datakit images
+  registry: ${ARTIFACTORY_URL}/airflow-datakits
+
+  # Available datakits for this project
+  available:
+    - name: sqlserver-source
+      version: v2.1.0
+      description: SQL Server source connector
+
+    - name: sqlserver-bronze
+      version: v1.3.2
+      description: Bronze ingestion processor
+
+  # Version strategy per environment
+  version_strategy:
+    local: latest
+    dev: development
+    int: stable
+    qa: stable
+    prod: v1.3.2  # Pinned version
+
+# Monitoring and observability
+monitoring:
+  # StatsD for metrics
+  statsd:
+    enabled: true
+    host: statsd.{{ .Namespace }}.svc.cluster.local
+    port: 9125
+
+  # Logging
+  logging:
+    # Send logs to centralized system
+    remote_logging: true
+    remote_base_log_folder: s3://company-airflow-logs/{{ .Tenant }}/{{ .Environment }}
+
+    # Log level per environment
+    log_level:
+      local: DEBUG
+      dev: INFO
+      int: INFO
+      qa: WARNING
+      prod: WARNING
+
+# Security settings
+security:
+  # Kerberos configuration
+  kerberos:
+    enabled: true
+    realm: ${KRB_REALM}
+    kdc: ${KRB_KDC}
+    admin_server: ${KRB_ADMIN_SERVER}
+
+    # Sidecar configuration
+    sidecar:
+      image: ${ARTIFACTORY_URL}/platform/kerberos-sidecar:v1.0.0
+      keytab_secret: kerberos-keytab
+      ticket_lifetime: 10h
+      renewal_interval: 1h
+
+  # Secrets backend (for Delinea integration)
+  secrets_backend:
+    backend: airflow.providers.hashicorp.secrets.vault.VaultBackend
+    backend_kwargs:
+      url: ${VAULT_URL}
+      auth_type: kubernetes
+      role: airflow
+      mount_point: airflow
+      kv_engine_version: 2
+
+# Environment-specific overrides
+environments:
+  local:
+    executor: LocalExecutor
+    debug: true
+
+  dev:
+    executor: CeleryExecutor
+    workers: 2
+
+  int:
+    executor: CeleryKubernetesExecutor
+    workers: 4
+
+  qa:
+    executor: KubernetesExecutor
+    max_pods: 10
+
+  prod:
+    executor: KubernetesExecutor
+    max_pods: 20
+    high_availability: true
+
+# Tenant-specific settings (for multi-tenancy)
+tenants:
+  finance:
+    namespace: airflow-finance
+    datakits:
+      - sqlserver-bronze
+      - oracle-bronze
+    connections:
+      - sql_server_prod
+      - oracle_prod
+
+  marketing:
+    namespace: airflow-marketing
+    datakits:
+      - salesforce-bronze
+      - mailchimp-bronze
+    connections:
+      - salesforce_api
+      - mailchimp_api
+
+# Astronomer platform integration
+astronomer:
+  # Houston API endpoint
+  houston_url: ${HOUSTON_URL}
+
+  # Platform version compatibility
+  min_platform_version: 0.30.0
+
+  # Update strategy
+  update_strategy: RollingUpdate
+
+  # Health checks
+  health_check:
+    enabled: true
+    initial_delay: 30
+    period: 60

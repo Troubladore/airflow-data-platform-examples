@@ -1,0 +1,55 @@
+# OpenMetadata Ingestion - Docker Compose Overrides
+# ==================================================
+# Connects this Astronomer project to platform services
+#
+# This override:
+# - Joins platform_network (access to OpenMetadata, pagila, SQL Server)
+# - Mounts Kerberos ticket cache (for SQL Server authentication)
+# - Configures Kerberos environment variables
+
+version: "3.8"
+
+services:
+  scheduler:
+    networks:
+      - platform-net
+    volumes:
+      # Mount Kerberos ticket cache (for SQL Server ingestion)
+      - platform_kerberos_cache:/krb5/cache:ro
+      # Mount corporate Kerberos config
+      - /etc/krb5.conf:/etc/krb5.conf:ro
+    environment:
+      # Kerberos configuration
+      KRB5CCNAME: /krb5/cache/krb5cc
+      KRB5_CONFIG: /etc/krb5.conf
+
+  webserver:
+    networks:
+      - platform-net
+    volumes:
+      - platform_kerberos_cache:/krb5/cache:ro
+      - /etc/krb5.conf:/etc/krb5.conf:ro
+    environment:
+      KRB5CCNAME: /krb5/cache/krb5cc
+      KRB5_CONFIG: /etc/krb5.conf
+
+  triggerer:
+    networks:
+      - platform-net
+    volumes:
+      - platform_kerberos_cache:/krb5/cache:ro
+      - /etc/krb5.conf:/etc/krb5.conf:ro
+    environment:
+      KRB5CCNAME: /krb5/cache/krb5cc
+      KRB5_CONFIG: /etc/krb5.conf
+
+# External network (managed by platform-bootstrap)
+networks:
+  platform-net:
+    external: true
+    name: platform_network
+
+# External volumes (managed by platform-bootstrap)
+volumes:
+  platform_kerberos_cache:
+    external: true

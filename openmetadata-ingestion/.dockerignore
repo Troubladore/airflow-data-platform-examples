@@ -1,0 +1,11 @@
+# Astronomer build exclusions
+.git
+.gitignore
+.env
+*.md
+README.*
+.astro
+__pycache__
+*.pyc
+.pytest_cache
+.DS_Store

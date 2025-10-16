@@ -1,0 +1,22 @@
+# Astronomer / Airflow
+.astro/
+.env
+airflow_settings.yaml
+*.pyc
+__pycache__/
+*.log
+
+# Python
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
