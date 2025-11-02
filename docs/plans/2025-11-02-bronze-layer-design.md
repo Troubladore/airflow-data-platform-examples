@@ -51,28 +51,32 @@ The platform maintains always-running services that datakits can leverage:
 
 ## Bronze Datakit Implementation
 
-### Component Structure (Using Pre-Built Runners)
+### Component Structure (Monorepo with Sub-Repositories)
 
 ```
-runners/                          # Pre-built runner images
-├── sqlmodel-runner/
-│   ├── Dockerfile               # All dependencies pre-installed
-│   └── requirements.txt        # Managed by platform team
-
-datakits/
-├── bronze-pagila/               # Just application code - no Dockerfile!
-│   ├── src/
-│   │   ├── models/             # SQLModel table definitions
-│   │   │   ├── pagila_tables.py # All Pagila table models
-│   │   │   └── temporal_base.py # TemporalTable mixins
-│   │   ├── ingestion/
-│   │   │   ├── loader.py       # DataFactory integration
-│   │   │   └── merger.py       # UPSERT operations
-│   │   └── main.py             # CLI entry point
-│   └── tests/                  # Unit and integration tests
+airflow-data-platform-examples/          # Monorepo root
+├── bronze-datakits-pagila/              # Sub-repo for Bronze layer
+│   ├── datakits/
+│   │   └── pagila-ingestion/
+│   │       ├── src/
+│   │       │   ├── models/             # SQLModel table definitions
+│   │       │   ├── ingestion/          # Loader and merger logic
+│   │       │   └── main.py             # Entry point
+│   │       └── tests/
+│   └── dags/
+│       └── bronze_ingestion_dag.py     # Bronze-specific DAGs
+│
+├── silver-datakits-pagila/              # Separate sub-repo (different team)
+├── gold-datakits-pagila/                # Separate sub-repo (BI team)
+├── datawarehouse-pagila/                # Separate sub-repo (platform team)
+│
+└── runners/                             # Shared runner images
+    └── sqlmodel-runner/
+        ├── Dockerfile                   # Pre-built with all dependencies
+        └── requirements.txt
 ```
 
-**Key Change**: Datakits contain only code, no Dockerfile or requirements.txt. Dependencies are managed in the pre-built runner image.
+**Key Design Decision**: Each layer (Bronze, Silver, Gold) is a separate sub-repository within the monorepo, reflecting real-world team boundaries and deployment patterns. In production, these would be independent repositories with different ownership and deployment cycles.
 
 ### Key Implementation Details
 
