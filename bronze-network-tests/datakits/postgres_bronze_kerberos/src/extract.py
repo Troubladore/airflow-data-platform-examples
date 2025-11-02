@@ -73,15 +73,34 @@ class PostgresBronzeExtractor:
         """Create Postgres connection with Kerberos"""
         logger.info(f"Connecting to {self.config['host']}:{self.config['port']}/{self.config['database']}")
 
+        # Get the principal from the ticket to extract username
+        username = None
+        import subprocess
+        try:
+            result = subprocess.run(['klist'], capture_output=True, text=True)
+            if result.returncode == 0:
+                # Extract principal name (e.g., emaynard from emaynard@ERUDITIS.LAB)
+                for line in result.stdout.split('\n'):
+                    if 'Default principal:' in line:
+                        principal = line.split(':')[1].strip()
+                        username = principal.split('@')[0]
+                        logger.info(f"Using Kerberos principal: {principal} (user: {username})")
+                        break
+        except:
+            pass
+
         # Connection string for Kerberos auth
-        # Note: With Kerberos, we don't need username/password
         conn_params = {
             'host': self.config['host'],
             'port': self.config['port'],
             'database': self.config['database'],
             'gssencmode': self.config['gssencmode'],
-            # Kerberos will use the ticket to authenticate
         }
+
+        # Add username if we extracted it from the ticket
+        # This is needed because container runs as root but ticket is for emaynard
+        if username:
+            conn_params['user'] = username
 
         try:
             conn = psycopg2.connect(**conn_params)

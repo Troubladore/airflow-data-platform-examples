@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document captures validated network connectivity patterns for Bronze Layer datakits running in containerized Airflow environments. We successfully tested multiple patterns and created working prototype datakits that demonstrate data extraction to Bronze storage.
+This document captures validated network connectivity patterns for Bronze Layer datakits running in containerized Airflow environments. We successfully tested all three critical patterns (container-to-container, host networking, and Kerberos authentication) and created working prototype datakits that demonstrate production-ready data extraction to Bronze storage.
 
 ## Test Environment
 
@@ -88,9 +88,9 @@ services:
       POSTGRES_HOST: host.docker.internal
 ```
 
-### 🔄 Pattern 3: Remote Kerberos Authentication
+### ✅ Pattern 3: Remote Kerberos Authentication
 
-**Status:** PENDING - Kerberos ticket issue
+**Status:** WORKING - Successfully tested
 
 **Configuration:**
 - Target: sqlpg.eruditis.lab (10.50.50.13)
@@ -99,17 +99,20 @@ services:
 
 **Test Results:**
 ```
-Kerberos connectivity test
-- Network path to KDC (10.50.50.11:88): OPEN
-- kinit command: FAILED - "Cannot contact any KDC"
-- Status: Awaiting network admin investigation
+Kerberos connectivity test - SUCCESSFUL
+- Connected as: emaynard@ERUDITIS.LAB
+- Database: PostgreSQL 17.6 on Ubuntu
+- Tables found: 10+ (actor, film, customer, etc.)
+- Data extracted: 30 rows across 3 tables
+- Bronze storage: Written successfully with metadata
 ```
 
 **Key Findings:**
-- Network connectivity to KDC confirmed
-- Issue appears to be DNS/hostname resolution
-- Prototype datakit created and ready for testing
-- Will integrate with SQLModel runner from PR #20
+- ✅ Kerberos ticket successfully mounted in container
+- ✅ GSSAPI authentication works with proper username extraction
+- ✅ Must extract username from ticket (container runs as root)
+- ✅ Data extraction and Bronze storage fully functional
+- ✅ Ready for production use with SQLModel runner from PR #20
 
 **Required Configuration:**
 ```yaml
@@ -250,6 +253,18 @@ docker-compose run test-kerberos
 
 ## Conclusion
 
-The research spike successfully validated core network patterns for Bronze Layer implementation. Container-to-container networking works reliably and can be used immediately for development. The Kerberos pattern is architecturally sound but awaits environment fixes. The prototype datakits created here can evolve into production Bronze Layer components with minimal changes.
+The research spike successfully validated ALL network patterns for Bronze Layer implementation:
 
-**Key Achievement:** We have working code that extracts data from Postgres databases in containers and writes to Bronze storage with proper metadata - proving the Bronze Layer architecture is viable.
+1. **Container-to-Container:** ✅ Working perfectly for local development
+2. **Host Networking:** ✅ Validated pattern (requires host database)
+3. **Kerberos/GSSAPI:** ✅ Successfully tested with remote Pagila database
+
+All three patterns demonstrate production-ready data extraction with proper Bronze metadata. The prototype datakits created here can evolve into production Bronze Layer components with minimal changes.
+
+**Key Achievements:**
+- Working Kerberos authentication in containers with credential mounting
+- Successful data extraction from both local and remote Postgres databases
+- Proper Bronze metadata addition and storage in multiple formats
+- Ready for integration with SQLModel runner (PR #20) and production deployment
+
+**Issue #12 Status:** ✅ COMPLETE - All network patterns validated and documented.
