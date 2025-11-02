@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Local Postgres with Pagila for container-to-container testing
   postgres-pagila:
