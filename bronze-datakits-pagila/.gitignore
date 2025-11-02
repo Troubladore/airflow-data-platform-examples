@@ -1,0 +1,52 @@
+# Bronze Datakits - Pagila
+# This would be a separate .gitignore in a real separate repository
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Data files (shouldn't commit large data)
+*.csv
+*.parquet
+*.json
+!config/*.json
+
+# Temporary files
+tmp/
+temp/
+scratch/
+
+# MacOS
+.DS_Store
+
+# Testing
+test-results/
+coverage.xml
+*.cover
