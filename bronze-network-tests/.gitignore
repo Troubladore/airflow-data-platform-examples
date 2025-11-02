@@ -1,0 +1,10 @@
+# Bronze data output (testing only)
+data/bronze/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Docker
+*.log

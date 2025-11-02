@@ -1,0 +1,7 @@
+# Required /etc/hosts entries for Bronze Network Tests
+#
+# These entries are needed for the Kerberos tests to work.
+# Please add these to your /etc/hosts file if not already present:
+
+10.50.50.11    dc1.eruditis.lab dc1 eruditis.lab
+10.50.50.13    sqlpg.eruditis.lab sqlserver.eruditis.lab
