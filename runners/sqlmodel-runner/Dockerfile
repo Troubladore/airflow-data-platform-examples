@@ -2,50 +2,76 @@
 # This runner includes all dependencies needed for temporal table operations
 # Code is mounted at runtime, not baked into the image
 
-ARG ASTRONOMER_VERSION=11.10.0-python-3.11
-ARG ASTRONOMER_REGISTRY=quay.io/astronomer/ap-airflow
+# Stage 1: Build dependencies
+FROM python:3.11-slim AS builder
 
-FROM ${ASTRONOMER_REGISTRY}:${ASTRONOMER_VERSION}
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy and install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt && \
+    pip install --no-cache-dir \
+        sqlmodel \
+        "psycopg[binary,pool]>=3.1.0" \
+        pandas>=2.0.0 \
+        openpyxl \
+        python-dotenv \
+        pydantic>=2.0.0 \
+        alembic \
+        rich \
+        typer && \
+    find /opt/venv -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type f -name '*.pyc' -delete
+
+# Stage 2: Final runtime image
+FROM python:3.11-slim
 
 USER root
 
-# Install system dependencies for PostgreSQL and Kerberos
+# Install only runtime dependencies (no gcc/g++)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
-    libpq-dev \
+    libpq5 \
     krb5-user \
-    gcc \
-    g++ \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Switch to astro user for Python packages
-USER astro
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-# Install sqlmodel-framework from sibling repo (will be from artifactory in production)
-# For now, we'll install the dependencies that would come with it
-RUN pip install --no-cache-dir \
-    sqlmodel \
-    psycopg[binary,pool] \
-    pandas>=2.0.0 \
-    openpyxl \
-    python-dotenv \
-    pydantic>=2.0.0 \
-    alembic \
-    rich \
-    typer
-
-# Set up environment for mounted code
-ENV PYTHONPATH=/app/src:/app/lib \
+# Set virtual environment path
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app/src:/app/lib \
     KRB5_CONFIG=/etc/krb5.conf \
     KRB5CCNAME=/var/krb5/cache/ccache
 
 # Create mount points for code and configuration
 RUN mkdir -p /app/src /app/config /app/lib /var/krb5/cache
+
+# Create a basic krb5.conf file (will be overridden by mounted config in production)
+RUN echo '[libdefaults]\n\
+    default_realm = EXAMPLE.COM\n\
+    ticket_lifetime = 24h\n\
+    renew_lifetime = 7d\n\
+    forwardable = true\n\
+[realms]\n\
+    EXAMPLE.COM = {\n\
+        kdc = kerberos.example.com\n\
+        admin_server = kerberos.example.com\n\
+    }\n\
+[domain_realm]\n\
+    .example.com = EXAMPLE.COM\n\
+    example.com = EXAMPLE.COM' > /etc/krb5.conf
 
 # Default working directory
 WORKDIR /app
