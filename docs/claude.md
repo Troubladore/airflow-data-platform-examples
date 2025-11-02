@@ -8,18 +8,19 @@ Development patterns, Git workflows, and lessons learned established for the air
 
 ### Workflow Rules:
 1. **ALL work** must be done on feature branches
-2. **ALL changes** must go through Pull Requests
-3. **NEVER** `git push origin main` directly
-4. **NEVER** commit to main, even for "small fixes"
+2. **ALL commits** must be signed with GPG (`git commit -S`)
+3. **ALL changes** must go through Pull Requests
+4. **NEVER** `git push origin main` directly
+5. **NEVER** commit to main, even for "small fixes"
 
 ### Correct Workflow:
 ```bash
 # Create feature branch
 git checkout -b fix/diagnostic-improvements
 
-# Make changes, commit
+# Make changes, commit with signature
 git add .
-git commit -m "fix: improve diagnostic"
+git commit -S -m "fix: improve diagnostic"
 
 # Push to feature branch
 git push origin fix/diagnostic-improvements
@@ -45,6 +46,42 @@ git checkout fix/accidental-work
 - Enables rollback and bisection
 - Tracks all changes through PR history
 - Allows CI/CD validation before merge
+
+## 🔐 Commit Signing Requirements
+
+**ALL commits must be signed with GPG to ensure authenticity and non-repudiation.**
+
+### Setting Up GPG Signing:
+```bash
+# Check if you have a GPG key
+gpg --list-secret-keys --keyid-format=long
+
+# If no key exists, generate one
+gpg --full-generate-key
+
+# Get your GPG key ID
+gpg --list-secret-keys --keyid-format=long
+# Look for the line starting with 'sec' and copy the ID after the '/'
+
+# Configure Git to use your GPG key
+git config --global user.signingkey YOUR_KEY_ID
+git config --global commit.gpgsign true
+```
+
+### Signing Commits:
+```bash
+# Always use -S flag when committing
+git commit -S -m "feat: add new feature"
+
+# Verify signature on commits
+git log --show-signature -1
+```
+
+### Why Commit Signing Matters:
+- **Authentication**: Proves the commit came from you
+- **Integrity**: Ensures commit hasn't been tampered with
+- **Compliance**: Required for many enterprise and open-source projects
+- **Trust**: Builds confidence in code provenance
 
 ## 🧹 Git Cleanup Automation
 
