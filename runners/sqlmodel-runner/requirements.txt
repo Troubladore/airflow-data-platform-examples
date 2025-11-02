@@ -1,0 +1,30 @@
+# SQLModel Runner Dependencies
+# These are pre-installed in the runner image
+# Developers don't manage these - just write code
+
+# Core Framework (will come from platform in production)
+sqlmodel>=0.0.14
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Database Drivers
+psycopg[binary,pool]>=3.1.0
+pymssql>=2.2.0  # For SQL Server if needed
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0  # Excel support
+
+# Utilities
+python-dotenv>=1.0.0
+typer>=0.9.0  # CLI framework
+rich>=13.0.0  # Pretty output
+tenacity>=8.2.0  # Retry logic
+
+# Database Migrations
+alembic>=1.12.0
+
+# Monitoring/Logging
+structlog>=23.0.0
+prometheus-client>=0.19.0

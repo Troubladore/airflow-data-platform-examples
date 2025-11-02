@@ -51,54 +51,67 @@ The platform maintains always-running services that datakits can leverage:
 
 ## Bronze Datakit Implementation
 
-### Component Structure
+### Component Structure (Using Pre-Built Runners)
 
 ```
+runners/                          # Pre-built runner images
+├── sqlmodel-runner/
+│   ├── Dockerfile               # All dependencies pre-installed
+│   └── requirements.txt        # Managed by platform team
+
 datakits/
-├── bronze-pagila/
-│   ├── Dockerfile                 # Extends Astronomer base
-│   ├── requirements.txt           # Python dependencies
+├── bronze-pagila/               # Just application code - no Dockerfile!
 │   ├── src/
-│   │   ├── models/               # SQLModel table definitions
+│   │   ├── models/             # SQLModel table definitions
 │   │   │   ├── pagila_tables.py # All Pagila table models
 │   │   │   └── temporal_base.py # TemporalTable mixins
 │   │   ├── ingestion/
-│   │   │   ├── loader.py        # DataFactory integration
-│   │   │   └── merger.py        # UPSERT operations
-│   │   └── main.py              # CLI entry point
-│   └── tests/                   # Unit and integration tests
+│   │   │   ├── loader.py       # DataFactory integration
+│   │   │   └── merger.py       # UPSERT operations
+│   │   └── main.py             # CLI entry point
+│   └── tests/                  # Unit and integration tests
 ```
+
+**Key Change**: Datakits contain only code, no Dockerfile or requirements.txt. Dependencies are managed in the pre-built runner image.
 
 ### Key Implementation Details
 
-1. **Table Models**
+1. **Runner Pattern**
+   - Pre-built `sqlmodel-runner` image with all dependencies
+   - Datakit code mounted at runtime via ConfigMap or volume
+   - No build step required for code changes
+
+2. **Table Models**
    - SQLModel classes for each Pagila table
    - TemporalTable mixin for automatic history
    - Field-level exclusion annotations where needed
 
-2. **Data Loading**
+3. **Data Loading**
    - DataFactory for bulk operations
    - Batch ID tracking for audit trail
    - Configurable batch sizes
 
-3. **Merge Operations**
+4. **Merge Operations**
    - UPSERT logic for incremental updates
    - Conflict resolution based on primary keys
    - Preservation of historical records
 
-4. **Trigger Management**
+5. **Trigger Management**
    - Automatic trigger creation on first run
    - INSERT, UPDATE, DELETE tracking
    - Temporal metadata (effective_time, systime, operation_type)
 
 ## DAG Orchestration Pattern
 
-### Parallel Table Ingestion
+### Parallel Table Ingestion with Runner Pattern
 
-The Bronze ingestion DAG orchestrates parallel processing of all Pagila tables:
+The Bronze ingestion DAG uses pre-built runners with mounted code:
 
 ```python
-# Conceptual DAG structure
+# Conceptual DAG structure using runners
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+from kubernetes.client import models as k8s
+
 PAGILA_TABLES = [
     'actor', 'address', 'category', 'city', 'country',
     'customer', 'film', 'film_actor', 'film_category',
@@ -106,9 +119,23 @@ PAGILA_TABLES = [
     'staff', 'store'
 ]
 
-# Each table gets its own KubernetesPodOperator task
-# Tasks run in parallel for optimal performance
-# Kerberos tickets mounted from platform services
+# Using pre-built runner image - no custom image build needed!
+for table in PAGILA_TABLES:
+    task = KubernetesPodOperator(
+        task_id=f'bronze_{table}',
+        # Pre-built runner with all dependencies
+        image='platform/runners/sqlmodel-runner:v1.0.0',
+        # Mount the datakit code at runtime
+        volume_mounts=[
+            k8s.V1VolumeMount(
+                name='datakit-code',
+                mount_path='/app/src',
+                sub_path='bronze-pagila/src'
+            )
+        ],
+        # Pass table-specific configuration
+        env_vars={'TABLE_NAME': table, 'MODE': 'incremental'}
+    )
 ```
 
 ### Orchestration Features
