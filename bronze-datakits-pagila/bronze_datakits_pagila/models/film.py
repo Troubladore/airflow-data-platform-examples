@@ -4,6 +4,9 @@ Film Bronze Model using framework BronzeMetadata
 This model represents the Bronze layer for the Pagila film table,
 using the sqlmodel-framework's BronzeMetadata mixin for standardized
 metadata tracking.
+
+Field Exclusions Implemented:
+- fulltext (tsvector) - EXCLUDED - Derived/computed field, can be regenerated in Silver
 """
 
 import sys
@@ -18,7 +21,11 @@ from sqlmodel_framework.base.models import BronzeMetadata
 
 
 class FilmBronze(BronzeMetadata, SQLModel, table=True):
-    """Bronze layer for Pagila film table"""
+    """Bronze layer for Pagila film table
+
+    Field Exclusion Strategy:
+    - fulltext: EXCLUDED (tsvector is derived from title+description, regenerate in Silver)
+    """
 
     __tablename__ = "bronze_film"
     __table_args__ = {"schema": "bronze"}
@@ -46,10 +53,9 @@ class FilmBronze(BronzeMetadata, SQLModel, table=True):
         default=None,
         description="Special features list (was array in source)"
     )
-    fulltext: Optional[str] = Field(
-        default=None,
-        description="Full-text search data (was tsvector in source)"
-    )
+
+    # FIELD EXCLUSIONS:
+    # fulltext (tsvector) - NOT INCLUDED - Derived field, can be regenerated from title+description in Silver layer
 
     # Bronze metadata fields are inherited from BronzeMetadata:
     # - bronze_load_timestamp: datetime

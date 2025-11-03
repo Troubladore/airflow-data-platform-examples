@@ -47,7 +47,6 @@ class TestFilmBronzeModel:
             rating="PG",
             last_update=datetime.now(),
             special_features="Deleted Scenes,Behind the Scenes",
-            fulltext="test film fulltext search",
             # Bronze metadata fields (required from framework)
             bronze_source_system="pagila_kerberos",
             bronze_source_table="film",
@@ -67,7 +66,7 @@ class TestFilmBronzeModel:
         assert film.replacement_cost == 19.99
         assert film.rating == "PG"
         assert film.special_features == "Deleted Scenes,Behind the Scenes"
-        assert film.fulltext == "test film fulltext search"
+        # fulltext field is EXCLUDED (tsvector, derived field)
 
     def test_film_bronze_has_metadata_fields(self):
         """Film Bronze model should have all Bronze metadata fields from framework"""
@@ -118,7 +117,7 @@ class TestFilmBronzeModel:
         assert film.replacement_cost == 19.99  # Default from Pagila
         assert film.rating == "G"  # Default rating
         assert film.special_features is None
-        assert film.fulltext is None
+        # fulltext field is EXCLUDED from Bronze model
 
     def test_film_bronze_persistence(self):
         """Film Bronze model should persist to database correctly"""
