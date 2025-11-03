@@ -1,0 +1,6 @@
+# Packages will be installed using your OS package manager
+
+# Note: Astro Runtime is based on Debian Linux, but your specific image may have a different package manager. Consult the Astronomer documentation for more information.
+
+# Kerberos client tools for authenticating with Pagila database
+krb5-user
