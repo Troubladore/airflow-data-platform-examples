@@ -1,0 +1,25 @@
+[project]
+name = "bronze-datakits-adventureworkslt"
+version = "0.1.0"
+description = "Bronze data kit for AdventureWorksLT (SQL Server with Kerberos)"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=2.0.0",
+    "sqlalchemy>=2.0.0",
+    "sqlmodel>=0.0.8",
+    "psycopg2-binary>=2.9.0",
+    "pyarrow>=10.0.0",
+    "pyyaml>=6.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+]
