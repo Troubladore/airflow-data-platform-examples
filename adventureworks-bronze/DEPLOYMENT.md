@@ -1,494 +1,161 @@
 # Deployment Guide
 
-Guide for deploying the AdventureWorksLT Bronze pipeline to production environments, including container image specifications for environments requiring pre-layered images.
+**Taking the Bronze pipeline from local development to production**
+
+This guide walks you through deploying the AdventureWorksLT Bronze pipeline to a production Airflow environment.
 
 ---
 
-## Table of Contents
+## Your Deployment Journey
 
-1. [Architecture Overview](#architecture-overview)
-2. [Container Image Requirements](#container-image-requirements)
-3. [Building Container Images](#building-container-images)
-4. [Deploying to Astronomer](#deploying-to-astronomer)
-5. [Corporate Environment Setup](#corporate-environment-setup)
+```
+Local Testing  →  Build Images  →  Configure Production  →  Deploy to Airflow
+   (You are        (See IMAGES.md)     (This guide)         (Astronomer/K8s)
+    here after
+   README.md)
+```
+
+**Where are you?**
+- ✅ Completed README.md and have the pipeline working locally
+- ⏭️  Now deploying to Astronomer or production Airflow
 
 ---
 
-## Architecture Overview
+## Deployment Checklist
 
-This example uses the **sqlmodel-framework** as a dependency for Bronze layer patterns. The framework can be:
-1. **Embedded** - Copy framework source into your image
-2. **Sidecar** - Mount framework as a sidecar container (future pattern)
-3. **Package** - Install as Python package from internal PyPI
+Before starting, ensure you have:
 
-### Framework Dependency
+- [ ] **Working local setup** - Completed all steps in README.md
+- [ ] **Container images built** - See [IMAGES.md](IMAGES.md)
+- [ ] **Production databases ready**
+  - SQL Server with AdventureWorksLT
+  - PostgreSQL for Bronze warehouse
+  - Both configured for Kerberos (or password auth)
+- [ ] **Airflow environment**
+  - Astronomer Cloud/Enterprise, or
+  - Self-hosted Airflow on Kubernetes
+- [ ] **Secrets management** - Kerberos keytabs or database credentials
 
-The Bronze datakit depends on:
-- `sqlmodel-framework` from `airflow-data-platform` repository
-- Location: `/home/emaynard/repos/airflow-data-platform/sqlmodel-framework/src`
+---
 
-**Current approach in this example:**
+## Step 1: Understanding Production Requirements
+
+### What Changes from Local to Production?
+
+| Aspect | Local Development | Production |
+|--------|------------------|-----------|
+| **Code execution** | Run Python directly | Run in containers |
+| **Configuration** | `config.yaml` file | Environment variables / Secrets |
+| **Kerberos** | Your personal ticket (`kinit`) | Keytab files in containers |
+| **Scheduling** | Manual (`python test_loader.py`) | Airflow DAG with schedule |
+| **Monitoring** | Terminal output | Airflow UI + logging system |
+
+---
+
+## Step 2: Configuration Management
+
+### Environment Variables Approach
+
+Instead of hardcoding in `config.yaml`, use environment variables for production:
+
+**Update `test_loader.py`** (or create `dag_loader.py`):
 ```python
-# In loader.py and models
-import sys
-sys.path.insert(0, '/home/emaynard/repos/airflow-data-platform/sqlmodel-framework/src')
+import os
 
-from sqlmodel_framework.base.loaders import BronzeIngestionPipeline
-from sqlmodel_framework.base.models import BronzeMetadata
+# Read from environment
+config = {
+    'source': {
+        'host': os.getenv('BRONZE_SOURCE_HOST', 'sql1.eruditis.lab'),
+        'database': os.getenv('BRONZE_SOURCE_DB', 'AdventureWorksLT'),
+        'use_kerberos': os.getenv('BRONZE_SOURCE_USE_KERB', 'true') == 'true',
+        'tables': os.getenv('BRONZE_TABLES', 'SalesLT.ProductCategory').split(',')
+    },
+    'target': {
+        'host': os.getenv('BRONZE_TARGET_HOST', 'sqlpg.eruditis.lab'),
+        'database': os.getenv('BRONZE_TARGET_DB', 'bronze_warehouse'),
+        'use_kerberos': os.getenv('BRONZE_TARGET_USE_KERB', 'true') == 'true',
+        # ...
+    }
+}
 ```
 
-**For production**, you'll want to package the framework or use a sidecar pattern.
-
----
-
-## Container Image Requirements
-
-### Base Image
-
-**Recommended:** `quay.io/astronomer/astro-runtime:latest`
-- Includes Airflow and common data tools
-- Based on Debian/Ubuntu
-- Supports apt package installation
-
-### System Dependencies
-
-The following system packages are required:
-
-1. **sqlcmd** (Microsoft SQL Server command-line tool)
-   - For Kerberos-authenticated SQL Server connections
-   - Installation:
-     ```dockerfile
-     # Add Microsoft repository
-     RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-     RUN curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list > /etc/apt/sources.list.d/mssql-release.list
-
-     # Install sqlcmd
-     RUN apt-get update && \
-         ACCEPT_EULA=Y apt-get install -y mssql-tools18 && \
-         echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc
-     ```
-
-2. **Kerberos Client** (if using Kerberos authentication)
-   - Usually included in base image, but verify:
-     ```dockerfile
-     RUN apt-get update && apt-get install -y \
-         krb5-user \
-         libkrb5-dev
-     ```
-
-3. **PostgreSQL Client Libraries**
-   - For GSSAPI support:
-     ```dockerfile
-     RUN apt-get update && apt-get install -y \
-         libpq-dev \
-         postgresql-client
-     ```
-
-### Python Dependencies
-
-From `pyproject.toml`:
-```
-pandas>=2.0.0
-sqlalchemy>=2.0.0
-sqlmodel>=0.0.8
-psycopg2-binary>=2.9.0
-pyarrow>=10.0.0
-pyyaml>=6.0.0
-```
-
-Plus the **sqlmodel-framework** (see options below).
-
----
-
-## Building Container Images
-
-### Option 1: Dockerfile with Embedded Framework (Recommended for Isolated Environments)
-
-**Dockerfile:**
-```dockerfile
-# Start from Astronomer runtime
-FROM quay.io/astronomer/astro-runtime:12.8.0
-
-# Set user to root for package installation
-USER root
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    lsb-release \
-    krb5-user \
-    libkrb5-dev \
-    libpq-dev \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Microsoft SQL Server tools (sqlcmd)
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
-    curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
-    apt-get update && \
-    ACCEPT_EULA=Y apt-get install -y mssql-tools18 && \
-    ln -s /opt/mssql-tools18/bin/sqlcmd /usr/local/bin/sqlcmd && \
-    rm -rf /var/lib/apt/lists/*
-
-# Switch back to astro user
-USER astro
-
-# Copy sqlmodel-framework into image
-COPY --chown=astro:astro airflow-data-platform/sqlmodel-framework /usr/local/airflow/sqlmodel-framework
-
-# Copy Bronze datakit
-COPY --chown=astro:astro adventureworks-bronze/bronze_datakits_adventureworkslt /usr/local/airflow/bronze_datakits_adventureworkslt
-COPY --chown=astro:astro adventureworks-bronze/config.yaml /usr/local/airflow/config.yaml
-COPY --chown=astro:astro adventureworks-bronze/pyproject.toml /usr/local/airflow/bronze-datakit-pyproject.toml
-
-# Install Python dependencies
-RUN pip install --no-cache-dir \
-    pandas>=2.0.0 \
-    sqlalchemy>=2.0.0 \
-    sqlmodel>=0.0.8 \
-    psycopg2-binary>=2.9.0 \
-    pyarrow>=10.0.0 \
-    pyyaml>=6.0.0
-
-# Update sys.path to include framework
-ENV PYTHONPATH="/usr/local/airflow/sqlmodel-framework/src:${PYTHONPATH}"
-```
-
-**Build script:**
-```bash
-#!/bin/bash
-# build-image.sh
-
-# Clone dependencies
-git clone https://github.com/Troubladore/airflow-data-platform.git
-git clone https://github.com/Troubladore/airflow-data-platform-examples.git
-
-# Build image
-docker build \
-  --tag your-registry.company.com/adventureworks-bronze:v1.0.0 \
-  --file Dockerfile \
-  .
-
-# Push to corporate registry
-docker push your-registry.company.com/adventureworks-bronze:v1.0.0
-```
-
-### Option 2: Multi-Stage Build (Cleaner)
-
-```dockerfile
-# Stage 1: Build stage
-FROM python:3.11-slim AS builder
-
-WORKDIR /build
-
-# Clone/copy sqlmodel-framework
-COPY airflow-data-platform/sqlmodel-framework ./sqlmodel-framework
-
-# Package framework as wheel
-WORKDIR /build/sqlmodel-framework
-RUN pip install build && \
-    python -m build --wheel
-
-# Stage 2: Runtime
-FROM quay.io/astronomer/astro-runtime:12.8.0
-
-USER root
-
-# System dependencies (same as Option 1)
-RUN apt-get update && apt-get install -y \
-    curl gnupg lsb-release \
-    krb5-user libkrb5-dev \
-    libpq-dev postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install sqlcmd
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
-    curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
-    apt-get update && \
-    ACCEPT_EULA=Y apt-get install -y mssql-tools18 && \
-    ln -s /opt/mssql-tools18/bin/sqlcmd /usr/local/bin/sqlcmd && \
-    rm -rf /var/lib/apt/lists/*
-
-USER astro
-
-# Copy framework wheel from builder
-COPY --from=builder /build/sqlmodel-framework/dist/*.whl /tmp/
-
-# Install framework and dependencies
-RUN pip install --no-cache-dir /tmp/*.whl && \
-    pip install --no-cache-dir \
-        pandas>=2.0.0 \
-        sqlalchemy>=2.0.0 \
-        sqlmodel>=0.0.8 \
-        psycopg2-binary>=2.9.0 \
-        pyarrow>=10.0.0 \
-        pyyaml>=6.0.0 && \
-    rm /tmp/*.whl
-
-# Copy Bronze datakit
-COPY --chown=astro:astro adventureworks-bronze/bronze_datakits_adventureworkslt /usr/local/airflow/bronze_datakits_adventureworkslt
-COPY --chown=astro:astro adventureworks-bronze/config.yaml /usr/local/airflow/config.yaml
-```
-
-### Option 3: Using Corporate PyPI Mirror
-
-If your company hosts an internal PyPI repository:
-
-**pyproject.toml (update framework dependency):**
-```toml
-[project]
-dependencies = [
-    "pandas>=2.0.0",
-    "sqlalchemy>=2.0.0",
-    "sqlmodel>=0.0.8",
-    "psycopg2-binary>=2.9.0",
-    "pyarrow>=10.0.0",
-    "pyyaml>=6.0.0",
-    "sqlmodel-framework>=1.0.0",  # ← From corporate PyPI
-]
-
-[[tool.uv.index]]
-url = "https://pypi.company.com/simple"  # ← Corporate mirror
-```
-
-**Dockerfile:**
-```dockerfile
-FROM quay.io/astronomer/astro-runtime:12.8.0
-
-USER root
-# System dependencies...
-USER astro
-
-# Copy Bronze datakit
-COPY --chown=astro:astro adventureworks-bronze /usr/local/airflow/bronze_datakits_adventureworkslt
-
-# Install from corporate PyPI
-RUN pip install --index-url https://pypi.company.com/simple \
-    -r /usr/local/airflow/bronze_datakits_adventureworkslt/requirements.txt
-```
-
----
-
-## Deploying to Astronomer
-
-### Local Development (Astro CLI)
-
-**Project structure:**
-```
-my-airflow-project/
-├── dags/
-│   └── adventureworks_bronze_dag.py
-├── include/
-│   ├── bronze_datakits_adventureworkslt/  # ← Bronze datakit
-│   ├── sqlmodel-framework/                 # ← Framework (if embedded)
-│   └── config.yaml
-├── Dockerfile
-├── packages.txt                            # System packages
-├── requirements.txt                        # Python packages
-└── airflow_settings.yaml
-```
-
-**Dockerfile (Astronomer project):**
-```dockerfile
-FROM quay.io/astronomer/astro-runtime:12.8.0
-```
-
-**packages.txt:**
-```
-krb5-user
-libkrb5-dev
-libpq-dev
-postgresql-client
-# sqlcmd requires manual installation - see Dockerfile
-```
-
-**requirements.txt:**
-```
-pandas>=2.0.0
-sqlalchemy>=2.0.0
-sqlmodel>=0.0.8
-psycopg2-binary>=2.9.0
-pyarrow>=10.0.0
-pyyaml>=6.0.0
-```
-
-**Custom Dockerfile for sqlcmd:**
-```dockerfile
-FROM quay.io/astronomer/astro-runtime:12.8.0
-
-USER root
-
-# Install sqlcmd
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
-    curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
-    apt-get update && \
-    ACCEPT_EULA=Y apt-get install -y mssql-tools18 && \
-    ln -s /opt/mssql-tools18/bin/sqlcmd /usr/local/bin/sqlcmd && \
-    rm -rf /var/lib/apt/lists/*
-
-USER astro
-
-# Set PYTHONPATH for framework
-ENV PYTHONPATH="/usr/local/airflow/include/sqlmodel-framework/src:${PYTHONPATH}"
-```
-
-**Deploy:**
-```bash
-# Start local Airflow
-astro dev start
-
-# Test locally
-astro dev bash
-python /usr/local/airflow/include/bronze_datakits_adventureworkslt/test_loader.py
-
-# Deploy to Astronomer cloud
-astro deploy
-```
-
-### Astronomer Deployment Variables
-
-Set these in Astronomer UI or `airflow_settings.yaml`:
-
+**Set in Astronomer:**
 ```yaml
-# Environment variables
+# airflow_settings.yaml
 environment_variables:
   - variable_name: "BRONZE_SOURCE_HOST"
-    value: "sql1.eruditis.lab"
+    value: "sql1.production.company.com"
 
   - variable_name: "BRONZE_SOURCE_DB"
     value: "AdventureWorksLT"
 
   - variable_name: "BRONZE_TARGET_HOST"
-    value: "sqlpg.eruditis.lab"
+    value: "postgres.production.company.com"
 
-  - variable_name: "BRONZE_TARGET_DB"
-    value: "bronze_warehouse"
+  - variable_name: "BRONZE_TABLES"
+    value: "SalesLT.ProductCategory,SalesLT.Product,SalesLT.Customer"
+```
 
-# Secrets (use Astronomer secrets management)
-# - Kerberos keytab file
-# - Database passwords (if not using Kerberos)
+**Or using Astronomer UI:**
+1. Go to your Deployment
+2. Environment → Environment Variables
+3. Add each variable
+
+---
+
+### Secrets Management
+
+**For Kerberos keytabs:**
+
+**Option 1: Astronomer Secrets**
+```bash
+# Create secret
+astro deployment secret create \
+  --deployment-id=your-deployment-id \
+  --key=KRB5_KEYTAB \
+  --value="$(base64 < /path/to/your.keytab)"
+```
+
+**Option 2: Kubernetes Secrets**
+```bash
+# Create secret
+kubectl create secret generic bronze-keytab \
+  --from-file=krb5.keytab=/path/to/your.keytab \
+  --namespace=your-namespace
+
+# Mount in deployment
+# (See Kerberos Setup section below)
 ```
 
 ---
 
-## Corporate Environment Setup
+## Step 3: Kerberos Setup in Containers
 
-### Pre-Layering Images (No PAT Required)
+### Understanding Kerberos in Production
 
-Many corporate environments restrict image building and require pre-layered images. Here's the process:
+**Local:** You run `kinit` manually, ticket stored in `/tmp/krb5cc_*`
+**Production:** Container needs keytab file and automatic kinit
 
-#### Image Build Specification
+### Approach 1: Keytab File (Recommended)
 
-**Base Images Required:**
-1. `quay.io/astronomer/astro-runtime:12.8.0` (or your corporate approved version)
-
-**Custom Layers to Add:**
-
-**Layer 1: System Dependencies**
-```dockerfile
-FROM quay.io/astronomer/astro-runtime:12.8.0 AS system-deps
-
-USER root
-
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    lsb-release \
-    krb5-user=1.20.1-* \
-    libkrb5-dev=1.20.1-* \
-    libpq-dev=15.* \
-    postgresql-client=15+* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Microsoft SQL Server tools
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
-    curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
-    apt-get update && \
-    ACCEPT_EULA=Y apt-get install -y mssql-tools18=18.3.* && \
-    ln -s /opt/mssql-tools18/bin/sqlcmd /usr/local/bin/sqlcmd && \
-    ln -s /opt/mssql-tools18/bin/bcp /usr/local/bin/bcp && \
-    rm -rf /var/lib/apt/lists/*
-
-USER astro
-
-# Tag: your-registry.company.com/astro-runtime-bronze:system-deps-v1
-```
-
-**Layer 2: Python Dependencies**
-```dockerfile
-FROM your-registry.company.com/astro-runtime-bronze:system-deps-v1 AS python-deps
-
-USER astro
-
-# Install Python packages from requirements file or inline
-RUN pip install --no-cache-dir \
-    pandas==2.3.3 \
-    sqlalchemy==2.0.44 \
-    sqlmodel==0.0.27 \
-    psycopg2-binary==2.9.11 \
-    pyarrow==22.0.0 \
-    pyyaml==6.0.3
-
-# Tag: your-registry.company.com/astro-runtime-bronze:python-deps-v1
-```
-
-**Layer 3: Application Code**
-```dockerfile
-FROM your-registry.company.com/astro-runtime-bronze:python-deps-v1
-
-USER astro
-
-# Copy framework
-COPY --chown=astro:astro sqlmodel-framework /usr/local/airflow/sqlmodel-framework
-
-# Copy Bronze datakit
-COPY --chown=astro:astro bronze_datakits_adventureworkslt /usr/local/airflow/include/bronze_datakits_adventureworkslt
-
-# Copy configuration (use ConfigMap/Secret in K8s instead)
-COPY --chown=astro:astro config.yaml /usr/local/airflow/include/config.yaml
-
-# Update PYTHONPATH
-ENV PYTHONPATH="/usr/local/airflow/sqlmodel-framework/src:${PYTHONPATH}"
-
-# Tag: your-registry.company.com/adventureworks-bronze:v1.0.0
-```
-
-#### Build and Push Script
-
+**Create keytab** (run on Kerberos KDC or with admin access):
 ```bash
-#!/bin/bash
-# build-and-push.sh
+# Interactive method
+ktutil
+addent -password -p airflow@YOUR.REALM -k 1 -e aes256-cts
+# Enter password when prompted
+wkt /path/to/airflow.keytab
+quit
 
-REGISTRY="your-registry.company.com"
-PROJECT="adventureworks-bronze"
-
-# Build base layers (do once, reuse across projects)
-docker build --target system-deps \
-  -t ${REGISTRY}/astro-runtime-bronze:system-deps-v1 \
-  -f Dockerfile.layers .
-
-docker push ${REGISTRY}/astro-runtime-bronze:system-deps-v1
-
-docker build --target python-deps \
-  -t ${REGISTRY}/astro-runtime-bronze:python-deps-v1 \
-  -f Dockerfile.layers .
-
-docker push ${REGISTRY}/astro-runtime-bronze:python-deps-v1
-
-# Build application layer (rebuild when code changes)
-docker build \
-  -t ${REGISTRY}/${PROJECT}:v1.0.0 \
-  -f Dockerfile.app .
-
-docker push ${REGISTRY}/${PROJECT}:v1.0.0
+# Verify
+klist -k /path/to/airflow.keytab
 ```
 
-### Kerberos Setup in Containers
+**Mount keytab in container:**
 
-**Option 1: Keytab File (Recommended)**
+For Astronomer:
 ```yaml
-# In Astronomer deployment or K8s
+# In your deployment configuration
 volumes:
   - name: krb5-keytab
     secret:
@@ -497,121 +164,485 @@ volumes:
 volumeMounts:
   - name: krb5-keytab
     mountPath: /etc/krb5.keytab
+    subPath: krb5.keytab
     readOnly: true
-
-env:
-  - name: KRB5_KTNAME
-    value: /etc/krb5.keytab
 ```
 
-**Option 2: Init Container with kinit**
-```yaml
-initContainers:
-  - name: kerberos-init
-    image: your-registry.company.com/krb5-client:latest
-    command:
-      - sh
-      - -c
-      - |
-        echo "${KRB5_PASSWORD}" | kinit ${KRB5_PRINCIPAL}
-        cp /tmp/krb5cc_* /shared/krb5cc
-    env:
-      - name: KRB5_PRINCIPAL
-        value: airflow@YOUR.REALM
-      - name: KRB5_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: kerberos-secret
-            key: password
-    volumeMounts:
-      - name: shared
-        mountPath: /shared
-```
-
-### Configuration Management
-
-**Use ConfigMaps for config.yaml:**
+For Kubernetes:
 ```yaml
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: bronze-config
-data:
-  config.yaml: |
-    source:
-      host: "sql1.eruditis.lab"
-      database: "AdventureWorksLT"
-      use_kerberos: true
-      tables:
-        - "SalesLT.ProductCategory"
-
-    target:
-      host: "sqlpg.eruditis.lab"
-      port: 5432
-      database: "bronze_warehouse"
-      schema: "bronze"
-      use_kerberos: true
-
-    storage:
-      bronze_path: "/tmp/bronze"
-      formats:
-        - "parquet"
+kind: Pod
+spec:
+  containers:
+  - name: airflow-worker
+    volumeMounts:
+    - name: krb5-keytab
+      mountPath: /etc/krb5.keytab
+      subPath: krb5.keytab
+      readOnly: true
+  volumes:
+  - name: krb5-keytab
+    secret:
+      secretName: bronze-keytab
 ```
 
-Mount in deployment:
-```yaml
-volumeMounts:
-  - name: bronze-config
-    mountPath: /usr/local/airflow/include/config.yaml
-    subPath: config.yaml
+**Use keytab in code:**
+
+Add to beginning of your DAG or loader:
+```python
+import subprocess
+import os
+
+def init_kerberos():
+    """Initialize Kerberos ticket from keytab"""
+    keytab_path = os.getenv('KRB5_KTNAME', '/etc/krb5.keytab')
+    principal = os.getenv('KRB5_PRINCIPAL', 'airflow@YOUR.REALM')
+
+    # Get ticket from keytab
+    result = subprocess.run(
+        ['kinit', '-kt', keytab_path, principal],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        raise Exception(f"kinit failed: {result.stderr}")
+
+    # Verify
+    klist_result = subprocess.run(['klist'], capture_output=True, text=True)
+    print(f"Kerberos ticket: {klist_result.stdout}")
+
+# Call at start of DAG run
+init_kerberos()
 ```
 
 ---
 
-## Image Registry Requirements
+### Approach 2: Init Container
 
-### Images to Host in Corporate Registry
+Run kinit before main container starts:
 
-1. **Base Astronomer Runtime**
-   - `quay.io/astronomer/astro-runtime:12.8.0`
-   - Pull from Quay, push to corporate registry
+```yaml
+initContainers:
+- name: kerberos-init
+  image: your-registry.com/krb5-client:latest
+  command:
+    - sh
+    - -c
+    - |
+      kinit -kt /etc/krb5.keytab airflow@YOUR.REALM
+      cp /tmp/krb5cc_* /shared/krb5cc
+  volumeMounts:
+    - name: krb5-keytab
+      mountPath: /etc/krb5.keytab
+      subPath: krb5.keytab
+    - name: shared
+      mountPath: /shared
 
-2. **Custom Bronze Runtime** (system deps + Python deps)
-   - `${REGISTRY}/astro-runtime-bronze:system-deps-v1`
-   - `${REGISTRY}/astro-runtime-bronze:python-deps-v1`
+containers:
+- name: airflow-worker
+  env:
+    - name: KRB5CCNAME
+      value: /shared/krb5cc
+  volumeMounts:
+    - name: shared
+      mountPath: /shared
+```
 
-3. **Application Image** (with Bronze datakit)
-   - `${REGISTRY}/adventureworks-bronze:v1.0.0`
+---
 
-### Example Pull and Push
+### Approach 3: Ticket Renewal Sidecar
+
+For long-running deployments, renew tickets automatically:
+
+```python
+# ticket_renewer.py
+import subprocess
+import time
+import logging
+
+def renew_ticket():
+    """Renew Kerberos ticket using keytab"""
+    subprocess.run(['kinit', '-R'], check=True)
+    logging.info("Kerberos ticket renewed")
+
+def main():
+    while True:
+        try:
+            renew_ticket()
+            time.sleep(3600)  # Renew every hour
+        except Exception as e:
+            logging.error(f"Renewal failed: {e}")
+            time.sleep(60)  # Retry after 1 minute
+
+if __name__ == "__main__":
+    main()
+```
+
+Run as sidecar:
+```yaml
+containers:
+- name: airflow-worker
+  # ... main container
+
+- name: ticket-renewer
+  image: your-image:tag
+  command: ["python", "/scripts/ticket_renewer.py"]
+  volumeMounts:
+    - name: krb5-keytab
+      mountPath: /etc/krb5.keytab
+```
+
+---
+
+## Step 4: Creating an Airflow DAG
+
+### Basic DAG Structure
+
+```python
+# dags/adventureworks_bronze_dag.py
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta
+import sys
+
+# Add datakit to path
+sys.path.insert(0, '/usr/local/airflow/include')
+
+from bronze_datakits_adventureworkslt.loader import AdventureWorksLTBronzeLoader
+
+default_args = {
+    'owner': 'data-team',
+    'depends_on_past': False,
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 2,
+    'retry_delay': timedelta(minutes=5),
+}
+
+def extract_table(table_name: str, **context):
+    """Extract single table"""
+    import os
+
+    # Initialize Kerberos
+    init_kerberos()  # From earlier example
+
+    # Create loader
+    loader = AdventureWorksLTBronzeLoader(
+        source_host=os.getenv('BRONZE_SOURCE_HOST'),
+        source_database=os.getenv('BRONZE_SOURCE_DB'),
+        use_kerberos=True,
+        target_db_url=os.getenv('BRONZE_TARGET_URL')
+    )
+
+    # Load table
+    result = loader.load_table(table_name)
+
+    # Return for XCom
+    return result
+
+with DAG(
+    'adventureworks_bronze_ingestion',
+    default_args=default_args,
+    description='Extract AdventureWorksLT tables to Bronze',
+    schedule_interval='0 2 * * *',  # 2 AM daily
+    start_date=datetime(2025, 1, 1),
+    catchup=False,
+    tags=['bronze', 'adventureworks', 'mssql'],
+) as dag:
+
+    # Create task for each table
+    tables = ['SalesLT.ProductCategory', 'SalesLT.Product', 'SalesLT.Customer']
+
+    for table in tables:
+        task = PythonOperator(
+            task_id=f'extract_{table.replace(".", "_")}',
+            python_callable=extract_table,
+            op_args=[table],
+            pool='bronze_pool',  # Limit concurrent extractions
+        )
+```
+
+---
+
+### Advanced DAG: Dynamic Task Creation
+
+```python
+# dags/adventureworks_bronze_dynamic_dag.py
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.utils.task_group import TaskGroup
+from datetime import datetime, timedelta
+import os
+
+# Table groups by size (for parallel processing)
+TABLE_GROUPS = {
+    'small': ['SalesLT.ProductCategory', 'SalesLT.ProductModel'],
+    'medium': ['SalesLT.Product', 'SalesLT.Customer'],
+    'large': ['SalesLT.SalesOrderHeader', 'SalesLT.SalesOrderDetail'],
+}
+
+def extract_table_group(group_name: str, **context):
+    """Extract all tables in a group"""
+    tables = TABLE_GROUPS[group_name]
+
+    for table in tables:
+        result = extract_table(table)
+        context['task_instance'].xcom_push(
+            key=f'{table}_result',
+            value=result
+        )
+
+with DAG(
+    'adventureworks_bronze_dynamic',
+    default_args=default_args,
+    schedule_interval='0 2 * * *',
+    start_date=datetime(2025, 1, 1),
+    catchup=False,
+) as dag:
+
+    # Create task group for each table group
+    for group_name in TABLE_GROUPS.keys():
+        with TaskGroup(group_id=f'{group_name}_tables') as tg:
+            task = PythonOperator(
+                task_id=f'extract_{group_name}',
+                python_callable=extract_table_group,
+                op_args=[group_name],
+            )
+
+    # Task groups run in parallel automatically
+```
+
+---
+
+## Step 5: Deploying to Astronomer
+
+### Astronomer Cloud / Enterprise
+
+**Project structure:**
+```
+my-airflow-project/
+├── dags/
+│   └── adventureworks_bronze_dag.py
+├── include/
+│   ├── bronze_datakits_adventureworkslt/
+│   └── config.yaml
+├── Dockerfile                          # Points to your image
+├── airflow_settings.yaml               # Environment variables
+└── .astro/                            # Astronomer config
+```
+
+**Dockerfile:**
+```dockerfile
+# Use your custom image from IMAGES.md
+FROM your-registry.company.com/adventureworks-bronze:v1.0.0
+
+# That's it! Image already has everything
+```
+
+**Deploy:**
+```bash
+# Login to Astronomer
+astro login
+
+# Initialize project (if needed)
+astro dev init
+
+# Test locally
+astro dev start
+
+# Deploy to production
+astro deploy --deployment-id=your-deployment-id
+```
+
+---
+
+### Self-Hosted Airflow on Kubernetes
+
+**Helm values:**
+```yaml
+# values.yaml
+images:
+  airflow:
+    repository: your-registry.company.com/adventureworks-bronze
+    tag: v1.0.0
+
+env:
+  - name: BRONZE_SOURCE_HOST
+    value: "sql1.production.company.com"
+  - name: BRONZE_TARGET_URL
+    valueFrom:
+      secretKeyRef:
+        name: bronze-db-credentials
+        key: target_url
+
+extraVolumes:
+  - name: krb5-keytab
+    secret:
+      secretName: bronze-keytab
+
+extraVolumeMounts:
+  - name: krb5-keytab
+    mountPath: /etc/krb5.keytab
+    subPath: krb5.keytab
+    readOnly: true
+
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/your-org/airflow-dags.git
+    branch: main
+    subPath: "dags/"
+```
+
+**Deploy:**
+```bash
+helm upgrade --install airflow apache-airflow/airflow \
+  --namespace airflow \
+  --values values.yaml
+```
+
+---
+
+## Step 6: Monitoring & Operations
+
+### Logging
+
+**Access logs in Astronomer:**
+```bash
+# View DAG logs
+astro deployment logs --deployment-id=your-deployment-id
+
+# Stream logs
+astro deployment logs --follow
+```
+
+**Access logs in Kubernetes:**
+```bash
+# View worker logs
+kubectl logs -n airflow -l component=worker --tail=100
+
+# Stream logs
+kubectl logs -n airflow -l component=worker -f
+```
+
+---
+
+### Alerting
+
+**Airflow email alerts** (configured in DAG):
+```python
+default_args = {
+    'email': ['data-team@company.com'],
+    'email_on_failure': True,
+    'email_on_retry': False,
+}
+```
+
+**Custom alerts on data quality:**
+```python
+def check_data_quality(**context):
+    """Verify Bronze data looks correct"""
+    import psycopg2
+
+    conn = psycopg2.connect(os.getenv('BRONZE_TARGET_URL'))
+    cursor = conn.execute("""
+        SELECT COUNT(*) FROM bronze.bronze_product_category
+        WHERE bronze_load_timestamp > NOW() - INTERVAL '1 hour'
+    """)
+
+    count = cursor.fetchone()[0]
+
+    if count == 0:
+        raise Exception("No data loaded in last hour!")
+
+    return count
+```
+
+---
+
+### Scaling
+
+**Adjust Airflow pools** for parallel extraction:
+```bash
+# Astronomer UI: Admin → Pools
+# or via Airflow CLI
+airflow pools set bronze_pool 3 "Bronze extraction pool"
+```
+
+**Assign tasks to pool:**
+```python
+task = PythonOperator(
+    task_id='extract_table',
+    python_callable=extract_table,
+    pool='bronze_pool',  # Max 3 concurrent
+)
+```
+
+---
+
+## Troubleshooting Production Issues
+
+### Container can't connect to databases
+
+**Check:**
+1. Network policies allow traffic
+2. Kerberos ticket is valid (`klist`)
+3. Database hostnames resolve (`nslookup`)
 
 ```bash
-# Pull from public registries
-docker pull quay.io/astronomer/astro-runtime:12.8.0
-
-# Re-tag for corporate registry
-docker tag quay.io/astronomer/astro-runtime:12.8.0 \
-  your-registry.company.com/astronomer/astro-runtime:12.8.0
-
-# Push to corporate registry
-docker push your-registry.company.com/astronomer/astro-runtime:12.8.0
+# Debug from container
+kubectl exec -it airflow-worker-xxx -- bash
+klist
+nslookup sql1.production.company.com
+sqlcmd -S sql1.production.company.com -G -C -Q "SELECT 1"
 ```
 
 ---
 
-## Verification Checklist
+### Kerberos tickets expire
 
-After deployment:
-
-- [ ] Container starts successfully
-- [ ] `sqlcmd` is available (`which sqlcmd`)
-- [ ] Kerberos ticket is valid (`klist`)
-- [ ] Can connect to SQL Server (`sqlcmd -S ... -G -C -Q "SELECT 1"`)
-- [ ] Can connect to PostgreSQL (`psql -h ... -d bronze_warehouse -c "SELECT 1"`)
-- [ ] Framework is importable (`python -c "from sqlmodel_framework.base.models import BronzeMetadata"`)
-- [ ] Bronze datakit is importable (`python -c "from bronze_datakits_adventureworkslt.loader import AdventureWorksLTBronzeLoader"`)
-- [ ] Test extraction works (`python test_loader.py`)
+**Solution:** Use ticket renewal sidecar (see Step 3, Approach 3)
 
 ---
 
-**Questions about deployment?** Create an issue with your specific environment details.
+### DAG imports fail
+
+**Check:**
+1. Image has datakit code
+2. PYTHONPATH is set correctly
+
+```bash
+# Test import
+kubectl exec -it airflow-worker-xxx -- \
+  python -c "from bronze_datakits_adventureworkslt.loader import AdventureWorksLTBronzeLoader; print('OK')"
+```
+
+---
+
+## Production Checklist
+
+Before going live:
+
+- [ ] **Images built and pushed** to corporate registry
+- [ ] **Secrets created** (keytabs, credentials)
+- [ ] **Environment variables** configured
+- [ ] **DAG tested** locally (`astro dev start`)
+- [ ] **Kerberos working** in container
+- [ ] **Database connections** verified
+- [ ] **Monitoring** set up (logs, alerts)
+- [ ] **Backup strategy** for Bronze data
+- [ ] **Runbook created** for on-call team
+
+---
+
+## Next Steps
+
+- **Monitor your pipeline** - Check Airflow UI for task success
+- **Add data quality checks** - Validate Bronze data
+- **Build Silver layer** - Transform Bronze for analytics
+- **Document runbook** - For operations team
+
+---
+
+**Questions?** See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) or create an issue.

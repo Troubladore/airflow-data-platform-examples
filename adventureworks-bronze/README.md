@@ -1,484 +1,192 @@
 # AdventureWorksLT Bronze Layer Example
 
-## SQL Server (MSSQL) → PostgreSQL Bronze Data Pipeline with Kerberos Authentication
+**Extract data from SQL Server → Load to PostgreSQL Bronze warehouse**
 
-This example demonstrates extracting data from **SQL Server** using **Kerberos authentication** and loading it into a **PostgreSQL** Bronze warehouse. Perfect for enterprise environments using Windows Active Directory / Samba AD for authentication.
+This example shows you how to build a Bronze layer data pipeline that:
+- Pulls data from **SQL Server** (Microsoft SQL Server)
+- Stores it in a **PostgreSQL** data warehouse
+- Uses **Kerberos** for authentication (no passwords!)
+- Tracks data lineage with Bronze metadata
 
-**What this example does:**
-- ✓ Connects to SQL Server using Kerberos (no passwords in code!)
-- ✓ Extracts tables from AdventureWorksLT sample database
-- ✓ Adds Bronze layer metadata (source system, load timestamp, etc.)
-- ✓ Loads data into PostgreSQL Bronze warehouse with Kerberos auth
-- ✓ Writes data to Parquet and JSON files for backup/analysis
+Perfect for enterprise environments using Active Directory or Samba AD.
 
 ---
 
-## Quick Start (5 Steps!)
+## What You'll Build
 
-### Step 1: Prerequisites
+A complete data pipeline that extracts one table from SQL Server's AdventureWorksLT sample database and loads it into PostgreSQL:
 
-Before you begin, ensure you have:
+**Source:** SQL Server → `AdventureWorksLT.SalesLT.ProductCategory` (41 rows)
+**Target:** PostgreSQL → `bronze_warehouse.bronze.bronze_product_category`
+**Authentication:** Kerberos (both source and target)
+**Output:** Database table + Parquet/JSON files
 
-**System Requirements:**
-- Python 3.9+
-- `uv` package manager installed ([instructions](https://github.com/astral-sh/uv))
-- `sqlcmd` for SQL Server ([install guide](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility))
-- Access to:
-  - SQL Server instance with AdventureWorksLT database
-  - PostgreSQL instance for Bronze warehouse
+Once you understand this example, you can easily add more tables by following the patterns.
 
-**Authentication Requirements:**
-- **Kerberos ticket** (run `kinit your_username@YOUR.REALM`)
-  - Verify with `klist` - you should see your principal
-- SQL Server configured for Kerberos authentication
-- PostgreSQL configured for GSSAPI authentication (see [pg_hba.conf setup](#postgresql-kerberos-setup))
+---
 
-**Quick verification:**
+## Prerequisites: What You Need
+
+Before starting, you'll need these ingredients ready:
+
+### 1. The Platform (Infrastructure)
+You need the Airflow Data Platform running with Kerberos services.
+
+**→ See:** [Platform Setup Guide](https://github.com/Troubladore/airflow-data-platform/blob/main/docs/getting-started.md)
+
+**Quick version:**
 ```bash
-# Check Kerberos ticket
-klist
-
-# Test SQL Server connection
-sqlcmd -S your-mssql-host -G -C -Q "SELECT @@VERSION"
-
-# Test PostgreSQL connection
-psql -h your-pg-host -d postgres -c "SELECT version()"
+git clone https://github.com/Troubladore/airflow-data-platform.git
+cd airflow-data-platform/platform-bootstrap
+make setup
 ```
 
-### Step 2: Clone and Install
+This sets up PostgreSQL, Kerberos KDC, and other platform services.
+
+### 2. Custom Images (Optional for Development)
+For local development, you can use Python directly. For production/Airflow deployment, you'll need container images.
+
+**→ See:** [IMAGES.md](IMAGES.md) - Details on building custom images with sqlcmd and Kerberos
+
+### 3. Source & Target Databases
+- **SQL Server** with AdventureWorksLT database
+- **PostgreSQL** server for Bronze warehouse
+- Both configured for Kerberos authentication
+
+**→ See:** Platform setup guide for Kerberos-enabled PostgreSQL configuration
+
+### 4. Your Workstation
+- Python 3.9+
+- `uv` package manager ([install guide](https://github.com/astral-sh/uv))
+- `sqlcmd` tool for SQL Server ([install guide](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility))
+- Valid Kerberos ticket (`kinit your_username@YOUR.REALM`)
+
+---
+
+## Getting Started: Your Journey
+
+### Step 1: Get the Code
 
 ```bash
-# Clone the repository
+# Clone this examples repository
 git clone https://github.com/Troubladore/airflow-data-platform-examples.git
 cd airflow-data-platform-examples/adventureworks-bronze
 
-# Install dependencies with uv
+# Install Python dependencies
 uv sync
 ```
 
-This installs:
-- pandas (data manipulation)
-- sqlalchemy & sqlmodel (database ORM)
-- psycopg2 (PostgreSQL driver with Kerberos support)
-- pyarrow (Parquet file format)
-- pyyaml (configuration files)
+**What this does:** Downloads the Bronze datakit code and installs required Python packages (pandas, sqlalchemy, psycopg2, etc.)
 
-### Step 3: Configure Your Environment
+### Step 2: Configure Your Environment
 
-Edit `config.yaml` with your server details:
+Edit `config.yaml` to point to your databases:
 
 ```yaml
-# Source Database (SQL Server)
 source:
-  host: "sql1.eruditis.lab"          # ← Change to your SQL Server
-  database: "AdventureWorksLT"       # ← Your source database
-  use_kerberos: true
+  host: "your-sqlserver.company.com"    # ← Your SQL Server
+  database: "AdventureWorksLT"
 
-  tables:
-    - "SalesLT.ProductCategory"      # ← Add more tables here
-
-# Target Database (PostgreSQL)
 target:
-  host: "sqlpg.eruditis.lab"         # ← Change to your PostgreSQL server
-  port: 5432
+  host: "your-postgres.company.com"     # ← Your PostgreSQL
   database: "bronze_warehouse"
-  schema: "bronze"
-  use_kerberos: true
-
-# Storage
-storage:
-  bronze_path: "/tmp/bronze"         # ← Where to write Parquet/JSON files
-  formats:
-    - "parquet"
-    - "json"
 ```
 
-**For password authentication instead of Kerberos:**
-```yaml
-source:
-  use_kerberos: false
-  # SQL Server uses Windows Auth by default, for SQL auth see docs
+**→ See:** [CONFIGURATION.md](CONFIGURATION.md) for complete configuration options (Kerberos vs passwords, adding tables, etc.)
 
-target:
-  use_kerberos: false
-  user: "your_username"
-  password: "your_password"  # Or leave empty for prompt
-```
-
-### Step 4: Setup Bronze Warehouse
+### Step 3: Create the Bronze Warehouse
 
 ```bash
-# This creates the bronze_warehouse database and tables
+# This creates the database and tables on PostgreSQL
 uv run python setup_bronze_warehouse.py
 ```
 
 **What this does:**
-1. Creates `bronze_warehouse` database on PostgreSQL
+1. Creates `bronze_warehouse` database
 2. Creates `bronze` schema
-3. Creates Bronze tables (e.g., `bronze_product_category`)
-4. Verifies setup
+3. Creates table: `bronze_product_category`
 
-**Expected output:**
-```
-================================================================================
-Bronze Warehouse Setup
-================================================================================
-Source: AdventureWorksLT on sql1.eruditis.lab
-Target: bronze_warehouse on sqlpg.eruditis.lab
-
-Step 1: Creating bronze_warehouse database
-✓ Database 'bronze_warehouse' created successfully
-
-Step 2: Creating bronze schema and tables
-✓ Schema 'bronze' created
-✓ All Bronze tables created successfully
-
-Step 3: Verifying setup
-✓ Connected to database: bronze_warehouse
-✓ Schema 'bronze' exists
-✓ Found 1 table(s) in bronze schema
-
-SUCCESS! Bronze warehouse is ready to use.
-```
-
-### Step 5: Run the Extraction
+### Step 4: Run the Extraction
 
 ```bash
-# Extract data from SQL Server → PostgreSQL
+# Extract from SQL Server → Load to PostgreSQL
 uv run python test_loader.py
 ```
 
 **Expected output:**
 ```
-================================================================================
-AdventureWorksLT Bronze Loader Test
-================================================================================
-Source: AdventureWorksLT on sql1.eruditis.lab
-Target: bronze_warehouse on sqlpg.eruditis.lab
-Tables to extract: 1
-
-================================================================================
 Extracting: SalesLT.ProductCategory
-================================================================================
 ✓ Successfully loaded 41 rows
-  Files written:
-    - parquet
-    - json
 
-================================================================================
-SUMMARY
-================================================================================
 Tables processed: 1/1
 Total rows loaded: 41
 ```
 
----
-
-## Verify Your Data
-
-### Check PostgreSQL Database
+### Step 5: Verify Your Data
 
 ```bash
-# Connect to bronze_warehouse
-psql -h sqlpg.eruditis.lab -d bronze_warehouse
-
-# View the data
-SELECT productcategoryid, name, bronze_source_system, bronze_load_timestamp
-FROM bronze.bronze_product_category
-ORDER BY productcategoryid
-LIMIT 10;
+# Check PostgreSQL
+psql -h your-postgres.company.com -d bronze_warehouse -c "
+  SELECT COUNT(*) FROM bronze.bronze_product_category
+"
 ```
 
-**What you'll see:**
-- All source columns (`productcategoryid`, `name`, etc.)
-- Bronze metadata columns:
-  - `bronze_load_timestamp` - When data was loaded
-  - `bronze_source_system` - Identifier (e.g., "adventureworkslt_kerberos")
-  - `bronze_source_table` - Original table name
-  - `bronze_source_host` - Source server
-  - `bronze_extraction_method` - How data was extracted
-
-### Check File Storage
-
-```bash
-# View parquet files
-ls -lh /tmp/bronze/adventureworkslt_kerberos/SalesLT_ProductCategory/
-
-# Read parquet with pandas
-uv run python -c "import pandas as pd; df = pd.read_parquet('/tmp/bronze/adventureworkslt_kerberos/SalesLT_ProductCategory/latest.parquet'); print(df.head())"
-```
+**You should see:** 41 rows with Bronze metadata (load timestamp, source system, etc.)
 
 ---
 
-## Adding More Tables
+## What's Next?
 
-Want to extract more tables from AdventureWorksLT? Follow these 3 steps:
+Now that you have the basic pipeline working:
 
-### 1. Identify the Table in SQL Server
-
-```bash
-# List all tables in AdventureWorksLT
-sqlcmd -S sql1.eruditis.lab -d AdventureWorksLT -G -C -Q "
-SELECT TABLE_SCHEMA, TABLE_NAME
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_TYPE = 'BASE TABLE'
-ORDER BY TABLE_NAME"
-```
-
-### 2. Create Bronze Model
-
-Create a new file in `bronze_datakits_adventureworkslt/models/` following the pattern:
-
-**Example: `product_bronze.py`**
-```python
-from sqlmodel import SQLModel, Field
-from datetime import datetime
-from typing import Optional
-import uuid
-import sys
-
-sys.path.insert(0, '/home/emaynard/repos/airflow-data-platform/sqlmodel-framework/src')
-from sqlmodel_framework.base.models import BronzeMetadata
-
-
-class ProductBronze(BronzeMetadata, SQLModel, table=True):
-    """Bronze layer for SalesLT.Product table"""
-    __tablename__ = "bronze_product"
-    __table_args__ = {"schema": "bronze"}
-
-    # Primary key
-    productid: int = Field(primary_key=True)
-
-    # Business fields (check SQL Server schema)
-    name: str
-    productnumber: str
-    color: Optional[str] = None
-    listprice: float
-    # ... add more fields as needed
-
-    modifieddate: datetime
-```
-
-### 3. Register the Model
-
-**a) Update `models/__init__.py`:**
-```python
-from .product_category_bronze import ProductCategoryBronze
-from .product_bronze import ProductBronze  # ← Add this
-
-__all__ = ["ProductCategoryBronze", "ProductBronze"]  # ← Add here
-```
-
-**b) Update `loader.py` TABLE_MODEL_MAP:**
-```python
-TABLE_MODEL_MAP = {
-    "SalesLT.ProductCategory": ProductCategoryBronze,
-    "SalesLT.Product": ProductBronze,  # ← Add this
-}
-```
-
-**c) Update `config.yaml`:**
-```yaml
-source:
-  tables:
-    - "SalesLT.ProductCategory"
-    - "SalesLT.Product"  # ← Add this
-```
-
-**d) Re-run setup and test:**
-```bash
-# Create new table in PostgreSQL
-uv run python setup_bronze_warehouse.py
-
-# Extract all tables
-uv run python test_loader.py
-```
-
-**See [CONFIGURATION.md](CONFIGURATION.md) for detailed customization guide.**
+1. **Add more tables** → [CONFIGURATION.md](CONFIGURATION.md) - Step-by-step guide
+2. **Deploy to production** → [DEPLOYMENT.md](DEPLOYMENT.md) - Container images and Airflow setup
+3. **Understand the code** → [ARCHITECTURE.md](ARCHITECTURE.md) - How the Bronze datakit works
+4. **Troubleshooting** → [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
 
 ---
 
-## PostgreSQL Kerberos Setup
+## Quick Reference
 
-If you're setting up PostgreSQL for Kerberos authentication, add this to `pg_hba.conf`:
-
-```conf
-# Allow Kerberos (GSSAPI) connections
-hostgssenc  all  all  0.0.0.0/0  gss include_realm=0 krb_realm=YOUR.REALM
-```
-
-Then restart PostgreSQL:
-```bash
-sudo systemctl restart postgresql
-```
-
----
-
-## Troubleshooting
-
-### "No Kerberos ticket found"
-
-```bash
-# Get a Kerberos ticket
-kinit your_username@YOUR.REALM
-
-# Verify
-klist
-```
-
-### "sqlcmd: command not found"
-
-Install the latest sqlcmd ([Microsoft docs](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility)):
-```bash
-# Example for Ubuntu/Debian
-curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-sudo add-apt-repository "$(curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list)"
-sudo apt-get update
-sudo apt-get install sqlcmd
-```
-
-### "pg_hba.conf rejects connection"
-
-PostgreSQL needs to allow Kerberos connections. See [PostgreSQL Kerberos Setup](#postgresql-kerberos-setup) above.
-
-### "integer out of range" or "NaN errors"
-
-This is fixed in the latest code (NULL handling). If you still see this, ensure you have the latest version.
-
-### "Permission denied to create database"
-
-Your PostgreSQL user needs `CREATEDB` privilege:
-```sql
--- Run as PostgreSQL superuser
-ALTER USER your_username CREATEDB;
-```
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Data Flow                                │
-└─────────────────────────────────────────────────────────────────┘
-
-   SQL Server                                    PostgreSQL
-   (Source)                                      (Bronze Warehouse)
-   ┌──────────────┐                             ┌──────────────────┐
-   │AdventureWorksLT│                           │bronze_warehouse  │
-   │              │                              │                  │
-   │  SalesLT.    │   ──sqlcmd + Kerberos──>   │  bronze.         │
-   │  Product     │                              │  product_        │
-   │  Category    │   ──Extract & Transform──>  │  category        │
-   │              │                              │                  │
-   │  (41 rows)   │                              │  + metadata      │
-   └──────────────┘                             │  (41 rows)       │
-                                                  └──────────────────┘
-                                                         │
-                                                         │
-                                                         v
-                                                  ┌──────────────────┐
-                                                  │ File Storage     │
-                                                  │ /tmp/bronze/     │
-                                                  │  - parquet       │
-                                                  │  - json          │
-                                                  └──────────────────┘
-```
-
-**Bronze Layer Metadata:**
-- `bronze_load_timestamp` - UTC timestamp when loaded
-- `bronze_source_system` - "adventureworkslt_kerberos"
-- `bronze_source_table` - e.g., "SalesLT.ProductCategory"
-- `bronze_source_host` - SQL Server hostname
-- `bronze_extraction_method` - "full_snapshot"
-
----
-
-## Corporate Environment Considerations
-
-### Using Custom Package Repositories
-
-If your corporate environment blocks PyPI:
-
-```bash
-# Use corporate PyPI mirror
-uv sync --index-url https://your-pypi-mirror.company.com/simple
-
-# Or install from pre-built wheels
-uv sync --find-links /path/to/wheels/
-```
-
-### Pre-building Container Images
-
-For Airflow/Astronomer deployments:
-
-```dockerfile
-FROM quay.io/astronomer/astro-runtime:latest
-
-# Copy the bronze datakit
-COPY bronze_datakits_adventureworkslt /usr/local/airflow/bronze_datakits_adventureworkslt
-
-# Install dependencies
-COPY pyproject.toml /tmp/
-RUN pip install -e /tmp/
-
-# Copy config (use secrets for production!)
-COPY config.yaml /usr/local/airflow/
-```
-
-### Using Custom Framework Paths
-
-If your company hosts the sqlmodel-framework internally:
-
-**Option 1: Modify sys.path in code**
-```python
-# In your models/loader files
-sys.path.insert(0, '/path/to/your/custom/sqlmodel-framework/src')
-```
-
-**Option 2: Install framework from corporate repository**
-```bash
-uv add sqlmodel-framework --index-url https://your-repo.company.com/simple
-```
-
----
-
-## Next Steps
-
-- **Production Deployment**: See [Astronomer deployment guide](../docs/deploying-to-astronomer.md)
-- **Silver Layer**: Transform Bronze data for analytics
-- **Scheduling**: Run extractions on a schedule with Airflow
-- **Monitoring**: Add data quality checks and alerting
-
----
-
-## Files in This Example
+### Files in This Example
 
 ```
 adventureworks-bronze/
-├── config.yaml                          # ← Configuration (source/target databases)
-├── setup_bronze_warehouse.py            # ← Creates PostgreSQL database/tables
-├── test_loader.py                       # ← Runs the extraction pipeline
-├── bronze_datakits_adventureworkslt/    # ← Main package
-│   ├── __init__.py
-│   ├── loader.py                        # ← Extraction logic
-│   └── models/                          # ← Bronze table definitions
-│       ├── __init__.py
-│       └── product_category_bronze.py
-├── pyproject.toml                       # ← Dependencies
-├── README.md                            # ← This file
-└── CONFIGURATION.md                     # ← Detailed customization guide
+├── README.md                          # ← You are here (start here!)
+├── CONFIGURATION.md                   # How to add tables and customize
+├── DEPLOYMENT.md                      # Production deployment guide
+├── IMAGES.md                          # Container image build guide
+├── ARCHITECTURE.md                    # How the code works
+├── TROUBLESHOOTING.md                 # Common issues and fixes
+├── config.yaml                        # Your database configuration
+├── setup_bronze_warehouse.py          # Creates PostgreSQL database/tables
+├── test_loader.py                     # Runs the extraction pipeline
+└── bronze_datakits_adventureworkslt/  # The Bronze datakit code
+```
+
+### Common Commands
+
+```bash
+# Setup
+uv sync                                          # Install dependencies
+uv run python setup_bronze_warehouse.py          # Create database/tables
+
+# Run extraction
+uv run python test_loader.py                     # Extract and load data
+
+# Verify
+psql -h HOST -d bronze_warehouse -c "SELECT COUNT(*) FROM bronze.bronze_product_category"
 ```
 
 ---
 
-## Learn More
+## Getting Help
 
-- [AdventureWorksLT Sample Database](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure)
-- [Kerberos Authentication Concepts](https://web.mit.edu/kerberos/)
-- [PostgreSQL GSSAPI Authentication](https://www.postgresql.org/docs/current/gssapi-auth.html)
-- [Bronze/Silver/Gold Architecture (Medallion)](https://www.databricks.com/glossary/medallion-architecture)
+- **Can't connect to databases?** → [TROUBLESHOOTING.md](TROUBLESHOOTING.md#connection-issues)
+- **Want to add more tables?** → [CONFIGURATION.md](CONFIGURATION.md#adding-new-tables)
+- **Need container images?** → [IMAGES.md](IMAGES.md)
+- **Questions about the code?** → [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
-**Questions or issues?** Open an issue on GitHub or check [CONFIGURATION.md](CONFIGURATION.md) for advanced topics.
+**Ready to get started?** Follow [Step 1](#step-1-get-the-code) above!
