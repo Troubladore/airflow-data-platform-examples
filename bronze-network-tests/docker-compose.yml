@@ -1,0 +1,92 @@
+services:
+  # Local Postgres with Pagila for container-to-container testing
+  postgres-pagila:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pagila
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    volumes:
+      - ./scripts/init-pagila.sql:/docker-entrypoint-initdb.d/init-pagila.sql:ro
+    networks:
+      - bronze-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Test local connectivity patterns
+  test-local:
+    build:
+      context: ./datakits/postgres_bronze_local
+      dockerfile: Dockerfile
+    environment:
+      # Test multiple connection patterns
+      POSTGRES_HOST: postgres-pagila  # Container-to-container
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: pagila
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      BRONZE_PATH: /data/bronze
+    volumes:
+      - ./data/bronze:/data/bronze
+    networks:
+      - bronze-network
+    depends_on:
+      postgres-pagila:
+        condition: service_healthy
+    command: python extract.py
+
+  # Test Kerberos connectivity to remote Postgres
+  test-kerberos:
+    build:
+      context: ./datakits/postgres_bronze_kerberos
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_HOST: sqlpg.eruditis.lab
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: pagila
+      BRONZE_PATH: /data/bronze
+      KRB5CCNAME: DIR:/tmp/krb5cc  # Credential cache location
+    volumes:
+      - ./data/bronze:/data/bronze
+      - /etc/krb5.conf:/etc/krb5.conf:ro  # Mount Kerberos config
+      - ~/.krb5-cache/dev:/tmp/krb5cc:ro  # Mount credential cache
+    extra_hosts:
+      # Add ERUDITIS.LAB hosts
+      - "dc1.eruditis.lab:10.50.50.11"
+      - "sqlpg.eruditis.lab:10.50.50.13"
+      - "sqlserver.eruditis.lab:10.50.50.13"
+    networks:
+      - bronze-network
+    command: python extract.py
+
+  # Test host networking (access host's Postgres)
+  test-host-network:
+    build:
+      context: ./datakits/postgres_bronze_local
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_HOST: host.docker.internal  # Docker Desktop host access
+      POSTGRES_PORT: 5432  # Assuming host has Postgres on standard port
+      POSTGRES_DB: pagila
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      BRONZE_PATH: /data/bronze
+    volumes:
+      - ./data/bronze:/data/bronze
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # For Linux compatibility
+    networks:
+      - bronze-network
+    command: python extract.py
+
+networks:
+  bronze-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
