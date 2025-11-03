@@ -1,84 +1,160 @@
 # Bronze Network Tests
 
-**Quick Start**: Diagnostic and validation tool for Bronze Layer network connectivity patterns.
+## 📦 What's Inside
 
-## 🎯 What & Why
+**This is now a reference implementation using sqlmodel-framework base classes.**
 
-**What**: Working prototype Bronze datakits that test and validate connectivity to Postgres databases (local and remote) with various authentication methods including Kerberos/GSSAPI.
+- **Framework Usage Examples** - Shows how to extend `PostgresConnector` and `BronzeIngestionPipeline`
+- **Network Validation** - Proves connectivity patterns work
+- **Configuration Examples** - Docker, Kerberos, networking setup
+- **Diagnostic Tool** - Validates your environment setup
 
-**Why**: Use this to:
-- **Diagnose** connectivity issues in your environment
-- **Validate** your Kerberos/Docker/network configuration
-- **Check assumptions** about Bronze Layer architecture
-- **Reference** working connection patterns for your own datakits
+### Key Files
+- `CONFIGURATION_REFERENCE.md` - ⭐ Connection patterns (now framework-based)
+- `datakits/postgres_bronze_kerberos/src/extract.py` - Framework extension example with Kerberos
+- `datakits/postgres_bronze_local/src/extract.py` - Local connectivity example
+- `docker-compose.yml` - Full test orchestration
 
-This is a proven, tested implementation you can use as a reference or diagnostic tool.
+## 🎯 For Production Use
 
-## 📚 Validated Patterns
+**Don't copy this code directly.** This is a diagnostic/validation tool.
 
-| Pattern | Target | Authentication | Status |
-|---------|--------|---------------|--------|
-| Remote Postgres | sqlpg.eruditis.lab:5432 | Kerberos/GSSAPI | ✅ Working |
-| Container-to-Container | postgres-pagila:5432 | Standard auth | ✅ Working |
-| Host Networking | host.docker.internal:5432 | Standard auth | ✅ Pattern Validated |
-| Kerberos Ticket Mounting | DIR:/tmp/krb5cc | Credential cache | ✅ Working |
+Instead:
+1. Install framework: `pip install git+https://github.com/Troubladore/airflow-data-platform.git@main#subdirectory=sqlmodel-framework`
+2. Extend base classes: `from sqlmodel_framework.base.connectors import PostgresConnector`
+3. Follow patterns shown here but use framework imports
 
 ## 🚀 Quick Start
 
-### Run Tests
-```bash
-cd bronze-network-tests
+### Using the Framework
 
-# Test container-to-container networking
-docker-compose run test-local
+```python
+from sqlmodel_framework.base.connectors import PostgresConnector, PostgresConfig
+from sqlmodel_framework.base.loaders import BronzeIngestionPipeline
 
-# Test Kerberos authentication (requires valid ticket)
-docker-compose run test-kerberos
+# Configure connection
+config = PostgresConfig(
+    host='your-postgres-host',
+    database='your-database',
+    use_kerberos=True  # or False for local
+)
 
-# Test host networking (requires host Postgres)
-docker-compose run test-host-network
+# Create connector
+connector = PostgresConnector(config)
+
+# Extend the pipeline
+class YourExtractor(BronzeIngestionPipeline):
+    def extract_data(self):
+        with self.connector.connection_context() as conn:
+            # Your extraction logic
+            pass
 ```
 
-### Validate Your Environment
-```bash
-# Check prerequisites
-./scripts/validate_connections.sh
+### Running Tests
 
-# Setup Kerberos
-./scripts/setup_kerberos.sh
+```bash
+# Install dependencies
+uv venv
+source .venv/bin/activate
+uv pip install -e .[dev]
+uv pip install -e ../airflow-data-platform/sqlmodel-framework
+
+# Run unit tests
+pytest datakits/*/tests/
+
+# Run integration tests with Docker
+docker-compose up test-kerberos test-local
 ```
 
-## 📦 What's Inside
+## 📂 Project Structure
 
-- **`CONFIGURATION_REFERENCE.md`** - ⭐ **START HERE** - All connection strings, configurations, and examples
-- **`datakits/postgres_bronze_kerberos/`** - Working Kerberos/GSSAPI implementation
-- **`datakits/postgres_bronze_local/`** - Container and host networking examples
-- **`docker-compose.yml`** - Full orchestration with all test patterns
-- **`scripts/`** - Validation and setup helpers
-- **`../docs/setup/NETWORK_PATTERNS.md`** - Detailed test results and findings
+```
+bronze-network-tests/
+├── datakits/
+│   ├── postgres_bronze_kerberos/    # Kerberos authentication example
+│   │   ├── src/
+│   │   │   └── extract.py          # Framework-based extractor
+│   │   ├── tests/
+│   │   │   └── test_framework_extractor.py
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   │
+│   └── postgres_bronze_local/       # Local development example
+│       ├── src/
+│       │   └── extract.py          # Framework-based extractor
+│       ├── tests/
+│       │   └── test_framework_extractor.py
+│       ├── Dockerfile
+│       └── requirements.txt
+│
+├── docker-compose.yml               # Test orchestration
+├── pyproject.toml                   # Project configuration
+├── CONFIGURATION_REFERENCE.md       # Detailed configuration guide
+└── README.md                        # This file
+```
 
-## 🔍 Key Findings
+## 🔧 Framework Benefits
 
-All patterns successfully validated:
+### Before (Custom Implementation)
+- 180+ lines of connection code per datakit
+- Manual Kerberos username extraction
+- Custom Bronze metadata handling
+- Error-prone subprocess calls
+- Inconsistent patterns across datakits
 
-- ✅ **Kerberos in Containers**: Working with proper credential cache mounting
-- ✅ **Username Extraction**: Must extract user from ticket (containers run as root)
-- ✅ **Host Networking**: `host.docker.internal` pattern validated
-- ✅ **Bronze Metadata**: Automatic addition of load timestamps and source tracking
-- ✅ **Multi-format Output**: Parquet and JSON both working
+### After (Framework-Based)
+- ~50 lines using framework classes
+- Automatic Kerberos handling
+- Standardized Bronze metadata
+- Tested, reliable connection management
+- Consistent patterns across all datakits
 
-See `CONFIGURATION_REFERENCE.md` for specific connection strings and Python code examples.
+## 📊 Test Coverage
 
-## 🎯 Using This for Your Own Datakits
+All extractors have comprehensive test coverage:
+- ✅ Framework inheritance verification
+- ✅ Connection handling with/without Kerberos
+- ✅ Bronze metadata addition
+- ✅ Context manager usage
+- ✅ Environment-specific configurations
 
-1. Review `CONFIGURATION_REFERENCE.md` for connection patterns
-2. Check `datakits/postgres_bronze_kerberos/src/extract.py` for Kerberos implementation
-3. Check `datakits/postgres_bronze_local/src/extract.py` for standard auth patterns
-4. Copy the Bronze metadata schema for consistency
-5. Use `docker-compose.yml` as a template for your own services
+## 🔍 Troubleshooting
 
-## 📖 Full Documentation
+### Common Issues
 
-- **Design**: `../docs/plans/2025-11-02-bronze-network-patterns-design.md`
-- **Results**: `../docs/setup/NETWORK_PATTERNS.md`
-- **Configuration**: `CONFIGURATION_REFERENCE.md`
+1. **Framework Import Error**
+   ```bash
+   pip install git+https://github.com/Troubladore/airflow-data-platform.git@main#subdirectory=sqlmodel-framework
+   ```
+
+2. **Kerberos Authentication**
+   - Ensure KRB5_CONFIG is set
+   - Check keytab permissions
+   - Verify ticket with `klist`
+
+3. **Docker Build Issues**
+   - Ensure Docker daemon is running
+   - Check network connectivity for git clone
+
+## 📚 Documentation
+
+- [Configuration Reference](CONFIGURATION_REFERENCE.md) - Detailed setup guide
+- [Framework Documentation](https://github.com/Troubladore/airflow-data-platform/tree/main/sqlmodel-framework) - Framework source and docs
+- [Issue #141](https://github.com/Troubladore/airflow-data-platform/issues/141) - Framework implementation
+- [Issue #12](https://github.com/Troubladore/airflow-data-platform-examples/issues/12) - Refactoring tracker
+
+## 🤝 Contributing
+
+This repo demonstrates framework usage patterns. To contribute:
+1. Follow TDD practices (test first, then implement)
+2. Use framework base classes
+3. Maintain test coverage
+4. Update documentation
+
+## 📄 License
+
+MIT
+
+## 🙏 Acknowledgments
+
+Built on top of the sqlmodel-framework from the airflow-data-platform project.

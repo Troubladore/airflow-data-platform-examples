@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with Pagila database for local testing
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pagila
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Kerberos extractor
+  test-kerberos:
+    build:
+      context: datakits/postgres_bronze_kerberos
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Override connection for testing without actual Kerberos
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: pagila
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - bronze-data:/data/bronze
+    command: |
+      bash -c "
+        echo 'Testing Kerberos extractor with framework...'
+        python src/extract.py
+      "
+
+  # Test local extractor
+  test-local:
+    build:
+      context: datakits/postgres_bronze_local
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: pagila
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - bronze-data:/data/bronze
+    command: |
+      bash -c "
+        echo 'Testing local extractor with framework...'
+        python src/extract.py
+      "
+
+volumes:
+  postgres-data:
+  bronze-data:
