@@ -1,0 +1,43 @@
+# AdventureWorksLT Bronze Layer Configuration
+#
+# This file defines the source (SQL Server) and target (PostgreSQL) databases
+# for the Bronze layer data extraction pipeline.
+
+# Source Database (SQL Server with Kerberos)
+source:
+  host: "sql1.eruditis.lab"
+  database: "AdventureWorksLT"
+  use_kerberos: true
+
+  # Tables to extract (schema.table format for SQL Server)
+  tables:
+    - "SalesLT.ProductCategory"
+    # Add more tables here as needed:
+    # - "SalesLT.Product"
+    # - "SalesLT.Customer"
+    # - "SalesLT.Address"
+
+# Target Database (PostgreSQL for Bronze warehouse)
+target:
+  host: "sqlpg.eruditis.lab"
+  port: 5432
+  database: "bronze_warehouse"
+  schema: "bronze"  # Bronze tables will be created in this schema
+
+  # Connection settings
+  # For Kerberos auth: leave user/password empty
+  # For password auth: uncomment and set these
+  # user: "your_username"
+  # password: "your_password"
+
+  use_kerberos: true  # Set to false if using password authentication
+
+# Bronze Layer Storage
+storage:
+  # Local file path for Bronze layer parquet/json files
+  bronze_path: "/tmp/bronze"
+
+  # File formats to write
+  formats:
+    - "parquet"
+    - "json"
