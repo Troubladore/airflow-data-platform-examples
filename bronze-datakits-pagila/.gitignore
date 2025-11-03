@@ -50,3 +50,6 @@ scratch/
 test-results/
 coverage.xml
 *.cover
+
+# Git worktrees
+.worktrees/
